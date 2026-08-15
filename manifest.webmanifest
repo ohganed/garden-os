@@ -1,0 +1,9 @@
+{
+  "name": "Garden OS",
+  "short_name": "Garden OS",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f5ef",
+  "theme_color": "#f4f5ef",
+  "description": "A calm garden memory and observation system."
+}
