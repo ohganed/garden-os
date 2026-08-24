@@ -1,4 +1,4 @@
-const plants = [
+const builtInPlants = [
   {id:'hellebore',name:'ヘレボルス・フェチダス',latin:'Helleborus foetidus',height:65,spread:45,sun:['shade','morning','part'],moisture:['moist'],winter:'evergreen',roles:['vertical','dark','winter','texture'],colors:['濃緑'],form:'切れ込み葉',spreadType:'clump',icon:'♟',tone:'#24372b',reason:'細かく裂けた濃緑葉が立ち上がり、冬も骨格を残す。'},
   {id:'tricyrtis',name:'ホトトギス ‘ミヤザキ’',latin:'Tricyrtis hirta ‘Miyazaki’',height:75,spread:35,sun:['shade','morning','part'],moisture:['moist'],winter:'deciduous',roles:['vertical','flower','texture'],colors:['緑','紫花'],form:'直立茎＋卵形葉',spreadType:'clump',icon:'⌇',tone:'#35483a',reason:'60〜80cmの細い立ち姿をつくり、秋に小花を添える。'},
   {id:'farfugium',name:'小型ツワブキ',latin:'Farfugium japonicum compact form',height:40,spread:45,sun:['shade','morning','part'],moisture:['moist'],winter:'evergreen',roles:['broad','winter','dark'],colors:['濃緑'],form:'丸い艶葉',spreadType:'clump',icon:'●',tone:'#294b31',reason:'丸く艶のある葉で、ギボウシとは異なる大葉の質感を足す。'},
@@ -16,6 +16,10 @@ const plants = [
   {id:'imperata',name:'ベニチガヤ',latin:'Imperata cylindrica ‘Rubra’',height:50,spread:50,sun:['sun','part'],moisture:['moist','dry'],winter:'deciduous',roles:['red','vertical'],colors:['赤','緑'],form:'直立する細葉',spreadType:'runner',icon:'⌇',tone:'#703d38',reason:'赤い細葉だが、色を保つにはより強い日照が必要。'},
   {id:'liriope',name:'ヤブラン',latin:'Liriope muscari',height:45,spread:40,sun:['shade','morning','part','sun'],moisture:['moist','dry'],winter:'evergreen',roles:['vertical','winter','flower'],colors:['濃緑'],form:'線形葉',spreadType:'clump',icon:'〽',tone:'#304736',reason:'丈夫な常緑の細葉。既存のシダの間に安定した線をつくる。'}
 ];
+
+const CUSTOM_PLANTS_KEY='plant-engine-custom-plants-v1';
+let customPlants=loadCustomPlants();
+let plants=[...builtInPlants,...customPlants];
 
 const roles = [
   ['winter','冬も葉を残す'],['dark','黒・濃色'],['blue','青緑・銀青'],['wine','ワイン色'],['camel','キャメル'],['vertical','細長い葉'],['broad','大きな葉'],['small','小型植物'],['ground','地表を覆う'],['flower','季節の花'],['texture','異なる葉形']
@@ -36,6 +40,58 @@ const winterLabel = {evergreen:'常緑',semi:'半常緑',deciduous:'冬は地上
 const spreadLabel = {clump:'株立ち',slow:'ゆっくり拡大',runner:'地下茎・ランナー'};
 const roleLabel = Object.fromEntries(roles);
 const area = p => Math.PI * (p.spread/2) ** 2 / 10000;
+
+function loadCustomPlants(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(CUSTOM_PLANTS_KEY)||'[]');
+    return Array.isArray(saved)?saved.filter(p=>p&&p.id&&p.name):[];
+  }catch{return [];}
+}
+function persistCustomPlants(){
+  localStorage.setItem(CUSTOM_PLANTS_KEY,JSON.stringify(customPlants));
+  plants=[...builtInPlants,...customPlants];
+}
+function escapeHtml(value=''){
+  return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+}
+function cleanText(value,fallback='',max=240){return String(value??fallback).trim().slice(0,max)||fallback;}
+function cleanList(value,allowed){
+  if(!Array.isArray(value))return [];
+  const items=value.map(v=>cleanText(v,'',60)).filter(Boolean);
+  return [...new Set(allowed?items.filter(v=>allowed.includes(v)):items)].slice(0,12);
+}
+function normalizeSources(value){
+  if(!Array.isArray(value))return [];
+  return value.map(source=>{
+    const title=cleanText(source?.title,'出典',160);
+    const url=cleanText(source?.url,'',500);
+    if(!/^https?:\/\//i.test(url))return null;
+    return {title,url,accessedAt:cleanText(source?.accessedAt,new Date().toISOString().slice(0,10),20)};
+  }).filter(Boolean).slice(0,8);
+}
+function normalizeResearchPlant(raw,existingId){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('JSONの最上位は植物1件のオブジェクトにしてください');
+  const name=cleanText(raw.name,'',120);if(!name)throw new Error('name（植物名）がありません');
+  const height=Number(raw.height),spread=Number(raw.spread);
+  if(!Number.isFinite(height)||height<=0||height>500)throw new Error('heightは1〜500cmの数値にしてください');
+  if(!Number.isFinite(spread)||spread<=0||spread>500)throw new Error('spreadは1〜500cmの数値にしてください');
+  const sun=cleanList(raw.sun,['shade','morning','part','sun']);if(!sun.length)throw new Error('sunに有効な日照区分がありません');
+  const moisture=cleanList(raw.moisture,['dry','moist','wet']);if(!moisture.length)throw new Error('moistureに有効な土壌水分区分がありません');
+  const winter=['evergreen','semi','deciduous'].includes(raw.winter)?raw.winter:'deciduous';
+  const validRoles=roles.map(([id])=>id),plantRoles=cleanList(raw.roles,validRoles);
+  const spreadType=['clump','slow','runner'].includes(raw.spreadType)?raw.spreadType:'clump';
+  const colors=cleanList(raw.colors);if(!colors.length)colors.push('緑');
+  const sources=normalizeSources(raw.sources);
+  return {
+    id:existingId||`custom-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    name,latin:cleanText(raw.latin,'学名未確認',160),height:Math.round(height),spread:Math.round(spread),sun,moisture,winter,
+    roles:plantRoles,colors,form:cleanText(raw.form,'葉形未確認',100),spreadType,
+    icon:cleanText(raw.icon,'❧',2),tone:/^#[0-9a-f]{6}$/i.test(raw.tone)?raw.tone:'#405848',
+    reason:cleanText(raw.reason,'現地条件との適合を確認してください。',360),sources,
+    confidence:['high','medium','low'].includes(raw.confidence)?raw.confidence:'medium',
+    researchNotes:cleanText(raw.researchNotes,'',500),researchedAt:cleanText(raw.researchedAt,new Date().toISOString().slice(0,10),20),origin:'custom'
+  };
+}
 
 function scorePlant(p){
   let score=100; const issues=[];
@@ -78,6 +134,92 @@ function renderExisting(){
   });
 }
 
+function buildResearchPrompt(){
+  const target=el('researchName').value.trim();
+  if(!target){el('researchStatus').textContent='先に植物名を入力してください';el('researchStatus').className='research-status error';return '';}
+  const wanted=[...state.roles].map(role=>roleLabel[role]).join('、')||'指定なし';
+  const prompt=`あなたは園芸植物データの調査員です。現在のWeb情報を検索し、「${target}」を日本（関東・栃木県小山市）で植栽するための情報を調べてください。
+
+現地条件：
+- 日照区分：${state.sun}（shade=日陰、morning=午前だけ日が当たる、part=半日陰、sun=日向）
+- 雨の翌日の土壌水分：${state.moisture}（dry=乾く、moist=適湿、wet=かなり湿る）
+- 許容草丈：${state.maxHeight}cm以下
+- 求める役割：${wanted}
+
+調査規則：
+1. 学名、成熟時の草丈・株張り、日照、土壌水分、冬の状態、広がり方、葉色、葉形を確認する。
+2. 品種名が曖昧なら、断定せずresearchNotesへ不確実性を書く。
+3. 販売店の説明だけに依存せず、植物園、大学・行政、公的園芸機関、生産者資料などを優先し、独立した出典を2件以上照合する。
+4. 日本の高温多湿、梅雨、冬の最低気温を考慮する。海外情報をそのまま日本へ適用しない。
+5. 数値に幅がある場合、一般的な成熟株の代表値をcm単位の数値でheightとspreadへ入れ、幅はresearchNotesへ書く。
+6. 次のJSONだけを出力する。説明文やMarkdownコード枠は付けない。
+
+許可値：
+- sun: shade, morning, part, sun の配列
+- moisture: dry, moist, wet の配列
+- winter: evergreen, semi, deciduous のいずれか
+- roles: winter, dark, blue, wine, camel, vertical, broad, small, ground, flower, texture の配列
+- spreadType: clump, slow, runner のいずれか
+- confidence: high, medium, low のいずれか
+
+{
+  "name":"日本語の標準名または流通名",
+  "latin":"学名・品種名",
+  "height":40,
+  "spread":40,
+  "sun":["morning","part"],
+  "moisture":["moist"],
+  "winter":"evergreen",
+  "roles":["winter","texture"],
+  "colors":["濃緑"],
+  "form":"葉の形と質感",
+  "spreadType":"clump",
+  "icon":"❧",
+  "tone":"#405848",
+  "reason":"この現地条件での採否判断に使える簡潔な説明",
+  "confidence":"medium",
+  "researchNotes":"数値幅、不確実性、栽培上の注意",
+  "researchedAt":"YYYY-MM-DD",
+  "sources":[{"title":"出典名","url":"https://...","accessedAt":"YYYY-MM-DD"}]
+}`;
+  el('researchPrompt').value=prompt;
+  el('researchStatus').textContent='プロンプトを生成しました';el('researchStatus').className='research-status success';
+  return prompt;
+}
+
+function parseResearchJson(text){
+  let cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
+  const first=cleaned.indexOf('{'),last=cleaned.lastIndexOf('}');
+  if(first>=0&&last>first)cleaned=cleaned.slice(first,last+1);
+  return JSON.parse(cleaned);
+}
+
+function renderCustomPlantList(){
+  el('customPlantCount').textContent=`${customPlants.length}件`;
+  const container=el('customPlantList');
+  if(!customPlants.length){container.innerHTML='<div class="existing-empty">まだ登録されていません</div>';return;}
+  container.innerHTML=customPlants.map(p=>`<div class="custom-plant-item"><span class="custom-tone" style="--custom-tone:${p.tone}">${escapeHtml(p.icon)}</span><div><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.latin)}・出典${p.sources?.length||0}件</small></div><button type="button" data-custom-delete="${escapeHtml(p.id)}">削除</button></div>`).join('');
+  container.querySelectorAll('[data-custom-delete]').forEach(button=>button.onclick=()=>{
+    const target=customPlants.find(p=>p.id===button.dataset.customDelete);
+    if(!target||!confirm(`${target.name}を端末内の植物DBから削除しますか？`))return;
+    customPlants=customPlants.filter(p=>p.id!==target.id);delete state.selected[target.id];persistCustomPlants();renderCustomPlantList();renderPlants();renderSelection();toast('登録植物を削除しました');
+  });
+}
+
+function registerResearchPlant(){
+  const status=el('researchStatus');
+  try{
+    const raw=parseResearchJson(el('researchJson').value);
+    const duplicate=customPlants.find(p=>p.name.toLowerCase()===String(raw.name||'').trim().toLowerCase()||(raw.latin&&p.latin.toLowerCase()===String(raw.latin).trim().toLowerCase()));
+    const plant=normalizeResearchPlant(raw,duplicate?.id);
+    customPlants=duplicate?customPlants.map(p=>p.id===duplicate.id?plant:p):[...customPlants,plant];
+    persistCustomPlants();renderCustomPlantList();renderPlants();
+    const sourceNote=plant.sources.length>=2?`出典${plant.sources.length}件を保持`:`出典が${plant.sources.length}件です。後日もう1件以上追加してください`;
+    status.textContent=`${duplicate?'更新':'登録'}完了：${plant.name}（${sourceNote}）`;status.className=`research-status ${plant.sources.length>=2?'success':'warning'}`;
+    toast(`${plant.name}を植物DBへ登録しました`);
+  }catch(error){status.textContent=`登録できません：${error.message}`;status.className='research-status error';}
+}
+
 function renderPlants(){
   const q=el('plantSearch').value.trim().toLowerCase();
   let rows=plants.map(p=>({...p,...scorePlant(p)})).filter(p=>!q||[p.name,p.latin,p.form,...p.colors,...p.roles].join(' ').toLowerCase().includes(q));
@@ -90,23 +232,24 @@ function renderPlants(){
     const gradeName={fit:'適合',caution:'要確認',reject:'条件外'}[grade];
     const matchedRoles=p.roles.filter(r=>state.roles.has(r)).map(r=>roleLabel[r]);
     const judgement=p.issues.length?p.issues.join('／'):p.reason;
+    const sourceBlock=p.sources?.length?`<details class="source-detail"><summary>調査出典 ${p.sources.length}件</summary>${p.sources.map(source=>`<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a>`).join('')}</details>`:'';
     return `<article class="plant-card grade-${grade} ${state.selected[p.id]?'selected':''} ${grade==='reject'?'dimmed':''}">
-      <div class="card-status"><span class="grade-badge ${grade}">${gradeName}</span><span>役割一致 ${p.matched}件</span></div>
+      <div class="card-status"><div><span class="grade-badge ${grade}">${gradeName}</span>${p.origin==='custom'?'<span class="local-badge">端末DB</span>':''}</div><span>役割一致 ${p.matched}件</span></div>
       <div class="plant-card-body">
-        <div class="plant-visual"><div class="leaf-icon" style="--leaf-bg:${p.tone}">${p.icon}</div><span>${p.colors.join('・')}</span></div>
+        <div class="plant-visual"><div class="leaf-icon" style="--leaf-bg:${escapeHtml(p.tone)}">${escapeHtml(p.icon)}</div><span>${escapeHtml(p.colors.join('・'))}</span></div>
         <div class="plant-main">
-          <h3>${p.name}</h3><span class="latin">${p.latin}</span>
+          <h3>${escapeHtml(p.name)}</h3><span class="latin">${escapeHtml(p.latin)}</span>
           <div class="spec-grid">
             <div><small>草丈</small><b>${p.height}cm</b></div><div><small>株張り</small><b>${p.spread}cm</b></div>
-            <div><small>冬姿</small><b>${winterLabel[p.winter]}</b></div><div><small>広がり</small><b>${spreadLabel[p.spreadType]}</b></div>
+            <div><small>冬姿</small><b>${escapeHtml(winterLabel[p.winter])}</b></div><div><small>広がり</small><b>${escapeHtml(spreadLabel[p.spreadType])}</b></div>
           </div>
-          <div class="botanical-detail"><span class="color-swatch" style="--swatch:${p.tone}"></span><b>葉形</b>${p.form}</div>
-          <div class="role-match"><b>一致</b>${matchedRoles.length?matchedRoles.join('・'):'指定した役割との一致なし'}</div>
-          <p class="reason"><b>${p.issues.length?'確認点':'選定理由'}</b>${judgement}</p>
+          <div class="botanical-detail"><span class="color-swatch" style="--swatch:${escapeHtml(p.tone)}"></span><b>葉形</b>${escapeHtml(p.form)}</div>
+          <div class="role-match"><b>一致</b>${escapeHtml(matchedRoles.length?matchedRoles.join('・'):'指定した役割との一致なし')}</div>
+          <p class="reason"><b>${p.issues.length?'確認点':'選定理由'}</b>${escapeHtml(judgement)}</p>${sourceBlock}
         </div>
         <div class="score-panel ${grade}" style="--score:${p.score}">
           <div class="score-ring"><span><strong>${p.score}</strong><small>/100</small></span></div>
-          <button type="button" data-select="${p.id}">${state.selected[p.id]?'採用済み':'採用'}</button>
+          <button type="button" data-select="${escapeHtml(p.id)}">${state.selected[p.id]?'採用済み':'採用'}</button>
         </div>
       </div>
     </article>`;
@@ -114,7 +257,8 @@ function renderPlants(){
 }
 
 function renderSelection(){
-  const entries=Object.entries(state.selected);
+  const entries=Object.entries(state.selected).filter(([id])=>plants.some(p=>p.id===id));
+  state.selected=Object.fromEntries(entries);
   el('selectionEmpty').hidden=entries.length>0;
   el('selectionList').innerHTML=entries.map(([id,count])=>{const p=plants.find(x=>x.id===id);return `<div class="selection-item"><div><b>${p.name}</b><small>${p.height}cm・${winterLabel[p.winter]}</small></div><input aria-label="${p.name}の株数" data-count="${id}" type="number" min="1" max="9" value="${count}"><button data-remove="${id}" aria-label="削除">×</button></div>`}).join('');
   const bed=Math.max(.1,Number(el('width').value)*Number(el('depth').value));
@@ -145,7 +289,7 @@ function diagnose(entries,percent){
 }
 
 function summary(){
-  const selected=Object.entries(state.selected).map(([id,n])=>`${plants.find(p=>p.id===id).name}×${n}`).join('、')||'未選択';
+  const selected=Object.entries(state.selected).map(([id,n])=>{const plant=plants.find(p=>p.id===id);return plant?`${plant.name}×${n}`:'';}).filter(Boolean).join('、')||'未選択';
   const existing=state.existing.map(item=>`${item.name} ${item.detail}`).join('、')||'なし';
   return `【${el('caseName').value}】\n地域：${el('region').value}\n場所：${el('location').value}\n寸法：${el('width').value}m × ${el('depth').value}m\n日照：${document.querySelector('[data-field="sun"] .active').textContent}\n土：${document.querySelector('[data-field="moisture"] .active').textContent}\n高さ上限：${state.maxHeight}cm\n既存：${existing}\n採用候補：${selected}`;
 }
@@ -182,8 +326,14 @@ el('saveCase').onclick=save;
 el('newCase').onclick=async()=>{if(confirm('現在の入力を消して新しい案件を始めますか？')){localStorage.removeItem('plant-engine-case');await deletePhoto();location.reload();}};
 el('copySummary').onclick=async()=>{await navigator.clipboard.writeText(summary());toast('相談メモをコピーしました');};
 el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');};
+el('openResearch').onclick=()=>{renderCustomPlantList();const dialog=el('researchDialog');typeof dialog.showModal==='function'?dialog.showModal():dialog.setAttribute('open','');};
+el('closeResearch').onclick=()=>{const dialog=el('researchDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
+el('buildPrompt').onclick=buildResearchPrompt;
+el('copyResearchPrompt').onclick=async()=>{const prompt=el('researchPrompt').value||buildResearchPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('Web調査用プロンプトをコピーしました');}catch{el('researchPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
+el('registerPlant').onclick=registerResearchPlant;
+el('researchDialog').addEventListener('click',event=>{if(event.target===el('researchDialog'))el('closeResearch').click();});
 
-restore();renderRoles();renderExisting();renderPlants();renderSelection();
+restore();renderRoles();renderExisting();renderCustomPlantList();renderPlants();renderSelection();
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
