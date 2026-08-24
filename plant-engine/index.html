@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Plant Engine" />
     <title>Plant Engine</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.4.0" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.5.0" />
     <link rel="apple-touch-icon" href="icons/icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=0.4.0" />
+    <link rel="stylesheet" href="styles.css?v=0.5.0" />
   </head>
   <body>
     <header class="topbar">
@@ -120,6 +120,11 @@
           </div>
         </div>
 
+        <section class="case-visuals" aria-labelledby="visualsHeading">
+          <div class="subheading"><div><h2 id="visualsHeading">案件イメージ</h2><small>AIで得た外観案を、この端末の案件へ保存</small></div><button type="button" class="text-button" id="openVisualPlanner">作成する</button></div>
+          <div id="conceptBoard" class="concept-board"></div>
+        </section>
+
         <div class="plan-actions">
           <button class="ghost" id="copySummary">相談メモをコピー</button>
           <button class="primary" id="makePlan">採用案を確定</button>
@@ -160,7 +165,30 @@
       </div>
     </dialog>
 
-    <script src="plant-candidates.js?v=0.4.0"></script>
-    <script src="app.js?v=0.4.0"></script>
+    <dialog id="visualDialog" class="research-dialog visual-dialog">
+      <div class="research-shell">
+        <header class="research-header">
+          <div><span class="eyebrow">AI GARDEN VISUALIZER</span><h2>採用案から外観イメージを作る</h2></div>
+          <button type="button" class="dialog-close" id="closeVisualPlanner" aria-label="閉じる">×</button>
+        </header>
+        <div class="visual-flow">
+          <section class="visual-step">
+            <span class="step-number">1</span>
+            <div><h3>現地写真をAIへ添付</h3><p>現地カルテに使った写真を、画像生成AIにも添付してください。建物・縁石・通路などを勝手に変えないための基準になります。</p></div>
+          </section>
+          <section class="visual-step prompt-step">
+            <span class="step-number">2</span>
+            <div><div class="research-label-row"><label for="visualPrompt">5案生成用プロンプト</label><button type="button" class="mini-button" id="buildVisualPrompt">再生成</button></div><textarea id="visualPrompt" readonly></textarea><button type="button" class="primary visual-copy" id="copyVisualPrompt">プロンプトをコピー</button></div>
+          </section>
+          <section class="visual-step">
+            <span class="step-number">3</span>
+            <div><h3>得られた画像を案件へ貼り付け</h3><p>画像を長押しで保存した後、下の5枠へ入れます。画像はGitHubへ送られず、この端末内だけに保存されます。</p><div id="visualUploadGrid" class="visual-upload-grid"></div></div>
+          </section>
+        </div>
+      </div>
+    </dialog>
+
+    <script src="plant-candidates.js?v=0.5.0"></script>
+    <script src="app.js?v=0.5.0"></script>
   </body>
 </html>

@@ -43,6 +43,14 @@ const winterLabel = {evergreen:'常緑',semi:'半常緑',deciduous:'冬は地上
 const spreadLabel = {clump:'株立ち',slow:'ゆっくり拡大',runner:'地下茎・ランナー'};
 const roleLabel = Object.fromEntries(roles);
 const area = p => Math.PI * (p.spread/2) ** 2 / 10000;
+const conceptPatterns=[
+  ['A','自然群生','高さと葉形を不規則に重ね、自然に増えた群落のように見せる'],
+  ['B','リズム配置','同じ植物を数か所で反復し、横長の植栽帯に流れとリズムをつくる'],
+  ['C','立体レイヤー','後方・中間・足元の三層を明確にし、奥行きを強く見せる'],
+  ['D','焦点と余白','主役となる植物群を一か所に置き、周囲に落ち着いた余白を残す'],
+  ['E','密度のある景観','成長後の混み合いを避けつつ、植え付け直後から群生感が出るよう配置する']
+];
+let conceptImages=Array(5).fill(null);
 
 function loadCustomPlants(){
   try{
@@ -314,11 +322,81 @@ function summary(){
   return `【${el('caseName').value}】\n地域：${el('region').value}\n場所：${el('location').value}\n寸法：${el('width').value}m × ${el('depth').value}m\n日照：${document.querySelector('[data-field="sun"] .active').textContent}\n土：${document.querySelector('[data-field="moisture"] .active').textContent}\n高さ上限：${state.maxHeight}cm\n既存：${existing}\n採用候補：${selected}`;
 }
 
+function buildVisualPrompt(){
+  const entries=Object.entries(state.selected).map(([id,count])=>{const plant=plants.find(p=>p.id===id);return plant?{...plant,count}:null;}).filter(Boolean);
+  if(!entries.length){toast('先に採用する植物を選んでください');return '';}
+  const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／草丈約${p.height}cm・株張り約${p.spread}cm・${p.form}${p.provisional?'［寸法等は暫定値］':''}`).join('\n');
+  const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}`).join('\n'):'- 既存植物なし';
+  const patterns=conceptPatterns.map(([key,title,description])=>`${key}. ${title}：${description}`).join('\n');
+  const prompt=`添付した現地写真を基準に、次の採用植物だけを使った庭の完成外観イメージを、A〜Eの5枚の独立した画像として作成してください。
+
+【現地】
+- 案件名：${el('caseName').value}
+- 地域：${el('region').value}
+- 場所：${el('location').value}
+- 植栽範囲：横${el('width').value}m × 奥行${el('depth').value}m
+- 日照：${document.querySelector('[data-field="sun"] .active').textContent}
+- 雨の翌日の土：${document.querySelector('[data-field="moisture"] .active').textContent}
+- 高さ上限：${state.maxHeight}cm
+
+【既存植物】
+${existing}
+
+【今回の採用植物と株数】
+${selected}
+
+【5つの配置方針】
+${patterns}
+
+【必須条件】
+1. 5案すべてで植物の種類と株数を変えず、配置構成だけを変える。色違いや撮影角度だけを別案として数えない。
+2. 採用リストにない植物を追加しない。既存植物は写真内の位置関係を尊重して残す。
+3. 添付写真の建物、壁、窓、通路、縁石、地面の形、遠景、光の方向を維持する。
+4. 指定された横幅・奥行・高さ上限を守り、植物を実寸に近い比率で描く。
+5. 葉の形、葉色、株立ち、広がり方を植物ごとに区別し、同じような葉へ均一化しない。
+6. 植え付け約2〜3年後の、管理された自然な成長状態として描く。過密、巨大化、非現実的な花数を避ける。
+7. 写実的なガーデン写真。人、文字、ラベル、鉢、家具、装飾品は加えない。
+8. A〜Eはそれぞれ別画像で出力し、画像の外側の説明文で案名と配置意図を簡潔に示す。画像内には文字を入れない。
+
+最初にA〜Eの構成差を短く整理し、その後5枚を順番に生成してください。`;
+  el('visualPrompt').value=prompt;
+  return prompt;
+}
+
+function openVisualPlanner(){
+  if(!Object.keys(state.selected).length){toast('先に採用する植物を選んでください');return;}
+  buildVisualPrompt();renderVisualUploadGrid();
+  const dialog=el('visualDialog');typeof dialog.showModal==='function'?dialog.showModal():dialog.setAttribute('open','');
+}
+
+function compressConceptImage(file){
+  return new Promise(resolve=>{
+    const image=new Image(),url=URL.createObjectURL(file);
+    image.onload=()=>{
+      const scale=Math.min(1,1600/Math.max(image.width,image.height));
+      const canvas=document.createElement('canvas');canvas.width=Math.round(image.width*scale);canvas.height=Math.round(image.height*scale);
+      canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);URL.revokeObjectURL(url);
+      canvas.toBlob(blob=>resolve(blob||file),'image/jpeg',.86);
+    };
+    image.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};image.src=url;
+  });
+}
+
+function conceptImageUrl(blob){return blob?URL.createObjectURL(blob):'';}
+function releaseConceptUrls(container){container.querySelectorAll('img[data-object-url]').forEach(img=>URL.revokeObjectURL(img.dataset.objectUrl));}
+function conceptCard(slot,mode){
+  const [key,title]=conceptPatterns[slot],blob=conceptImages[slot],url=conceptImageUrl(blob);
+  if(mode==='upload')return `<div class="visual-upload-slot ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${key}案 ${title}">`:'<span class="upload-plus">＋</span>'}<b>${key}｜${title}</b><label><input type="file" accept="image/*" data-concept-upload="${slot}">${blob?'画像を変更':'画像を選ぶ'}</label>${blob?`<button type="button" data-concept-delete="${slot}">削除</button>`:''}</div>`;
+  return `<article class="concept-card ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${key}案 ${title}">`:'<div class="concept-placeholder">${key}</div>'}<div><b>${key}｜${title}</b><small>${blob?'端末内に保存済み':'まだ画像がありません'}</small></div></article>`;
+}
+function renderVisualUploadGrid(){const container=el('visualUploadGrid');releaseConceptUrls(container);container.innerHTML=conceptPatterns.map((_,i)=>conceptCard(i,'upload')).join('');}
+function renderConceptBoard(){const container=el('conceptBoard');releaseConceptUrls(container);container.innerHTML=conceptPatterns.map((_,i)=>conceptCard(i,'board')).join('');}
+
 function toast(msg){const t=el('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1800);}
 function openPhotoDb(){
   return new Promise((resolve,reject)=>{
-    const request=indexedDB.open('plant-engine-media',1);
-    request.onupgradeneeded=()=>request.result.createObjectStore('photos');
+    const request=indexedDB.open('plant-engine-media',2);
+    request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('photos'))request.result.createObjectStore('photos');if(!request.result.objectStoreNames.contains('concept-images'))request.result.createObjectStore('concept-images');};
     request.onsuccess=()=>resolve(request.result);
     request.onerror=()=>reject(request.error);
   });
@@ -326,17 +404,26 @@ function openPhotoDb(){
 async function storePhoto(blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').put(blob,'current-case');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 async function loadPhoto(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('photos','readonly');const req=tx.objectStore('photos').get('current-case');req.onsuccess=()=>{db.close();resolve(req.result);};req.onerror=()=>reject(req.error);});}
 async function deletePhoto(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').delete('current-case');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function storeConceptImage(slot,blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').put(blob,`current-case-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function loadConceptImages(){const db=await openPhotoDb();return Promise.all(conceptPatterns.map((_,slot)=>new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readonly');const req=tx.objectStore('concept-images').get(`current-case-${slot}`);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);}))).finally(()=>db.close());}
+async function deleteConceptImage(slot){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').delete(`current-case-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function deleteAllConceptImages(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').clear();tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 function showPhoto(blob){if(!blob)return;const old=el('photoPreview').dataset.objectUrl;if(old)URL.revokeObjectURL(old);const url=URL.createObjectURL(blob);el('photoPreview').dataset.objectUrl=url;el('photoPreview').src=url;el('photoPreview').hidden=false;el('photoPrompt').hidden=true;}
 
 function save(){const data={caseName:el('caseName').value,region:el('region').value,location:el('location').value,width:el('width').value,depth:el('depth').value,sun:state.sun,moisture:state.moisture,maxHeight:state.maxHeight,selected:state.selected,roles:[...state.roles],existing:state.existing};localStorage.setItem('plant-engine-case',JSON.stringify(data));toast('相談案件をiPad内に保存しました');}
-async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[])});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const photo=await loadPhoto();if(photo)showPhoto(photo);}catch{}}
+async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[])});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const [photo,concepts]=await Promise.all([loadPhoto(),loadConceptImages()]);if(photo)showPhoto(photo);conceptImages=concepts;renderConceptBoard();}catch{renderConceptBoard();}}
 
 document.addEventListener('click',e=>{
   const seg=e.target.closest('.segmented button');if(seg){const g=seg.parentElement;g.querySelectorAll('button').forEach(b=>b.classList.remove('active'));seg.classList.add('active');state[g.dataset.field]=seg.dataset.value;renderPlants();return;}
   const select=e.target.closest('[data-select]');if(select){const id=select.dataset.select;state.selected[id]?delete state.selected[id]:state.selected[id]=1;renderPlants();renderSelection();return;}
   const remove=e.target.closest('[data-remove]');if(remove){delete state.selected[remove.dataset.remove];renderPlants();renderSelection();}
+  const conceptDelete=e.target.closest('[data-concept-delete]');if(conceptDelete){const slot=Number(conceptDelete.dataset.conceptDelete);deleteConceptImage(slot).then(()=>{conceptImages[slot]=null;renderVisualUploadGrid();renderConceptBoard();toast(`${conceptPatterns[slot][0]}案の画像を削除しました`);}).catch(()=>toast('画像を削除できませんでした'));}
 });
-document.addEventListener('change',e=>{if(e.target.matches('[data-count]')){state.selected[e.target.dataset.count]=Math.max(1,Number(e.target.value));renderSelection();}if(['width','depth'].includes(e.target.id))renderSelection();});
+document.addEventListener('change',async e=>{
+  if(e.target.matches('[data-count]')){state.selected[e.target.dataset.count]=Math.max(1,Number(e.target.value));renderSelection();}
+  if(['width','depth'].includes(e.target.id))renderSelection();
+  if(e.target.matches('[data-concept-upload]')){const file=e.target.files?.[0];if(!file)return;const slot=Number(e.target.dataset.conceptUpload);try{const blob=await compressConceptImage(file);await storeConceptImage(slot,blob);conceptImages[slot]=blob;renderVisualUploadGrid();renderConceptBoard();toast(`${conceptPatterns[slot][0]}案を案件へ保存しました`);}catch{toast('画像を保存できませんでした');}}
+});
 el('maxHeight').addEventListener('input',e=>{state.maxHeight=Number(e.target.value);el('heightOutput').textContent=`${state.maxHeight}cm`;renderPlants();});
 el('plantSearch').addEventListener('input',()=>{state.visibleLimit=60;renderPlants();});
 el('databaseFilter').addEventListener('change',()=>{state.visibleLimit=60;renderPlants();});
@@ -346,17 +433,22 @@ el('photoInput').addEventListener('change',async e=>{const f=e.target.files[0];i
 el('clearRoles').onclick=()=>{state.roles.clear();renderRoles();renderPlants();};
 el('clearSelection').onclick=()=>{state.selected={};renderPlants();renderSelection();};
 el('saveCase').onclick=save;
-el('newCase').onclick=async()=>{if(confirm('現在の入力を消して新しい案件を始めますか？')){localStorage.removeItem('plant-engine-case');await deletePhoto();location.reload();}};
+el('newCase').onclick=async()=>{if(confirm('現在の入力・現地写真・外観イメージを消して新しい案件を始めますか？')){localStorage.removeItem('plant-engine-case');await Promise.all([deletePhoto(),deleteAllConceptImages()]);location.reload();}};
 el('copySummary').onclick=async()=>{await navigator.clipboard.writeText(summary());toast('相談メモをコピーしました');};
-el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');};
+el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');openVisualPlanner();};
+el('openVisualPlanner').onclick=openVisualPlanner;
+el('closeVisualPlanner').onclick=()=>{const dialog=el('visualDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
+el('buildVisualPrompt').onclick=buildVisualPrompt;
+el('copyVisualPrompt').onclick=async()=>{const prompt=el('visualPrompt').value||buildVisualPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('5案生成用プロンプトをコピーしました');}catch{el('visualPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
 el('openResearch').onclick=()=>{renderCustomPlantList();const dialog=el('researchDialog');typeof dialog.showModal==='function'?dialog.showModal():dialog.setAttribute('open','');};
 el('closeResearch').onclick=()=>{const dialog=el('researchDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
 el('buildPrompt').onclick=buildResearchPrompt;
 el('copyResearchPrompt').onclick=async()=>{const prompt=el('researchPrompt').value||buildResearchPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('Web調査用プロンプトをコピーしました');}catch{el('researchPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
 el('registerPlant').onclick=registerResearchPlant;
 el('researchDialog').addEventListener('click',event=>{if(event.target===el('researchDialog'))el('closeResearch').click();});
+el('visualDialog').addEventListener('click',event=>{if(event.target===el('visualDialog'))el('closeVisualPlanner').click();});
 
-restore();renderRoles();renderExisting();renderCustomPlantList();renderPlants();renderSelection();
+renderConceptBoard();restore();renderRoles();renderExisting();renderCustomPlantList();renderPlants();renderSelection();
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -364,5 +456,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.4.0').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.5.0').then(reg=>reg.update()).catch(()=>{});
 }
