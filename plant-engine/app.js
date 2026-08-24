@@ -33,6 +33,8 @@ const state = {
 
 const el = id => document.getElementById(id);
 const winterLabel = {evergreen:'常緑',semi:'半常緑',deciduous:'冬は地上部なし'};
+const spreadLabel = {clump:'株立ち',slow:'ゆっくり拡大',runner:'地下茎・ランナー'};
+const roleLabel = Object.fromEntries(roles);
 const area = p => Math.PI * (p.spread/2) ** 2 / 10000;
 
 function scorePlant(p){
@@ -81,14 +83,32 @@ function renderPlants(){
   let rows=plants.map(p=>({...p,...scorePlant(p)})).filter(p=>!q||[p.name,p.latin,p.form,...p.colors,...p.roles].join(' ').toLowerCase().includes(q));
   const sort=el('sortMode').value;
   rows.sort(sort==='height'?(a,b)=>a.height-b.height:sort==='name'?(a,b)=>a.name.localeCompare(b.name,'ja'):(a,b)=>b.score-a.score);
-  el('resultCount').textContent=`${rows.length}候補`;
+  const counts=rows.reduce((n,p)=>{p.score>=80?n.fit++:p.score>=55?n.caution++:n.reject++;return n;},{fit:0,caution:0,reject:0});
+  el('resultCount').textContent=`適合 ${counts.fit}｜要確認 ${counts.caution}｜条件外 ${counts.reject}`;
   el('plantList').innerHTML=rows.map(p=>{
     const grade=p.score>=80?'fit':p.score>=55?'caution':'reject';
-    const note=p.issues[0]||p.reason;
-    return `<article class="plant-card ${state.selected[p.id]?'selected':''} ${grade==='reject'?'dimmed':''}">
-      <div class="leaf-icon" style="--leaf-bg:${p.tone}">${p.icon}</div>
-      <div class="plant-main"><h3>${p.name}</h3><span class="latin">${p.latin}</span><div class="tags"><span>${p.height}cm</span><span>${winterLabel[p.winter]}</span><span>${p.form}</span></div><p class="reason">${note}</p></div>
-      <div class="score ${grade}"><strong>${p.score}</strong><small>適合度</small><button data-select="${p.id}">${state.selected[p.id]?'採用済み':'採用'}</button></div>
+    const gradeName={fit:'適合',caution:'要確認',reject:'条件外'}[grade];
+    const matchedRoles=p.roles.filter(r=>state.roles.has(r)).map(r=>roleLabel[r]);
+    const judgement=p.issues.length?p.issues.join('／'):p.reason;
+    return `<article class="plant-card grade-${grade} ${state.selected[p.id]?'selected':''} ${grade==='reject'?'dimmed':''}">
+      <div class="card-status"><span class="grade-badge ${grade}">${gradeName}</span><span>役割一致 ${p.matched}件</span></div>
+      <div class="plant-card-body">
+        <div class="plant-visual"><div class="leaf-icon" style="--leaf-bg:${p.tone}">${p.icon}</div><span>${p.colors.join('・')}</span></div>
+        <div class="plant-main">
+          <h3>${p.name}</h3><span class="latin">${p.latin}</span>
+          <div class="spec-grid">
+            <div><small>草丈</small><b>${p.height}cm</b></div><div><small>株張り</small><b>${p.spread}cm</b></div>
+            <div><small>冬姿</small><b>${winterLabel[p.winter]}</b></div><div><small>広がり</small><b>${spreadLabel[p.spreadType]}</b></div>
+          </div>
+          <div class="botanical-detail"><span class="color-swatch" style="--swatch:${p.tone}"></span><b>葉形</b>${p.form}</div>
+          <div class="role-match"><b>一致</b>${matchedRoles.length?matchedRoles.join('・'):'指定した役割との一致なし'}</div>
+          <p class="reason"><b>${p.issues.length?'確認点':'選定理由'}</b>${judgement}</p>
+        </div>
+        <div class="score-panel ${grade}" style="--score:${p.score}">
+          <div class="score-ring"><span><strong>${p.score}</strong><small>/100</small></span></div>
+          <button type="button" data-select="${p.id}">${state.selected[p.id]?'採用済み':'採用'}</button>
+        </div>
+      </div>
     </article>`;
   }).join('')||'<div class="empty-state"><b>該当する植物がありません</b><small>条件または検索語を変更してください</small></div>';
 }
@@ -171,5 +191,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.1.4').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.2.0').then(reg=>reg.update()).catch(()=>{});
 }
