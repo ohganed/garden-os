@@ -21,7 +21,15 @@ const roles = [
   ['winter','冬も葉を残す'],['dark','黒・濃色'],['blue','青緑・銀青'],['wine','ワイン色'],['camel','キャメル'],['vertical','細長い葉'],['broad','大きな葉'],['small','小型植物'],['ground','地表を覆う'],['flower','季節の花'],['texture','異なる葉形']
 ];
 
-const state = { sun:'morning', moisture:'moist', maxHeight:80, roles:new Set(['winter','dark','blue','wine','camel','vertical','broad','small','texture']), selected:{} };
+const state = {
+  sun:'morning', moisture:'moist', maxHeight:80,
+  roles:new Set(['winter','dark','blue','wine','camel','vertical','broad','small','texture']),
+  selected:{},
+  existing:[
+    {id:'halcyon',name:'ギボウシ ‘Halcyon’',detail:'1株'},
+    {id:'ferns',name:'既存のシダ',detail:'半分残す'}
+  ]
+};
 
 const el = id => document.getElementById(id);
 const winterLabel = {evergreen:'常緑',semi:'半常緑',deciduous:'冬は地上部なし'};
@@ -48,6 +56,22 @@ function renderRoles(){
       state.roles.has(role)?state.roles.delete(role):state.roles.add(role);
       renderRoles();
       renderPlants();
+    };
+  });
+}
+
+function renderExisting(){
+  const container=el('existingList');
+  if(!state.existing.length){
+    container.innerHTML='<div class="existing-empty">既存植物なし</div>';
+    return;
+  }
+  container.innerHTML=state.existing.map(item=>`<div class="existing-item"><span>${item.name}</span><b>${item.detail}</b><button type="button" data-existing-remove="${item.id}" aria-label="${item.name}を削除">×</button></div>`).join('');
+  container.querySelectorAll('[data-existing-remove]').forEach(button=>{
+    button.onclick=()=>{
+      state.existing=state.existing.filter(item=>item.id!==button.dataset.existingRemove);
+      renderExisting();
+      toast('既存植物から削除しました');
     };
   });
 }
@@ -102,7 +126,8 @@ function diagnose(entries,percent){
 
 function summary(){
   const selected=Object.entries(state.selected).map(([id,n])=>`${plants.find(p=>p.id===id).name}×${n}`).join('、')||'未選択';
-  return `【${el('caseName').value}】\n地域：${el('region').value}\n場所：${el('location').value}\n寸法：${el('width').value}m × ${el('depth').value}m\n日照：${document.querySelector('[data-field="sun"] .active').textContent}\n土：${document.querySelector('[data-field="moisture"] .active').textContent}\n高さ上限：${state.maxHeight}cm\n既存：ギボウシ ‘Halcyon’ 1株、シダを半分残す\n採用候補：${selected}`;
+  const existing=state.existing.map(item=>`${item.name} ${item.detail}`).join('、')||'なし';
+  return `【${el('caseName').value}】\n地域：${el('region').value}\n場所：${el('location').value}\n寸法：${el('width').value}m × ${el('depth').value}m\n日照：${document.querySelector('[data-field="sun"] .active').textContent}\n土：${document.querySelector('[data-field="moisture"] .active').textContent}\n高さ上限：${state.maxHeight}cm\n既存：${existing}\n採用候補：${selected}`;
 }
 
 function toast(msg){const t=el('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1800);}
@@ -119,7 +144,7 @@ async function loadPhoto(){const db=await openPhotoDb();return new Promise((reso
 async function deletePhoto(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').delete('current-case');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 function showPhoto(blob){if(!blob)return;const old=el('photoPreview').dataset.objectUrl;if(old)URL.revokeObjectURL(old);const url=URL.createObjectURL(blob);el('photoPreview').dataset.objectUrl=url;el('photoPreview').src=url;el('photoPreview').hidden=false;el('photoPrompt').hidden=true;}
 
-function save(){const data={caseName:el('caseName').value,region:el('region').value,location:el('location').value,width:el('width').value,depth:el('depth').value,sun:state.sun,moisture:state.moisture,maxHeight:state.maxHeight,selected:state.selected,roles:[...state.roles]};localStorage.setItem('plant-engine-case',JSON.stringify(data));toast('相談案件をiPad内に保存しました');}
+function save(){const data={caseName:el('caseName').value,region:el('region').value,location:el('location').value,width:el('width').value,depth:el('depth').value,sun:state.sun,moisture:state.moisture,maxHeight:state.maxHeight,selected:state.selected,roles:[...state.roles],existing:state.existing};localStorage.setItem('plant-engine-case',JSON.stringify(data));toast('相談案件をiPad内に保存しました');}
 async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[])});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const photo=await loadPhoto();if(photo)showPhoto(photo);}catch{}}
 
 document.addEventListener('click',e=>{
@@ -138,7 +163,7 @@ el('newCase').onclick=async()=>{if(confirm('現在の入力を消して新しい
 el('copySummary').onclick=async()=>{await navigator.clipboard.writeText(summary());toast('相談メモをコピーしました');};
 el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');};
 
-restore();renderRoles();renderPlants();renderSelection();
+restore();renderRoles();renderExisting();renderPlants();renderSelection();
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -146,5 +171,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.1.3').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.1.4').then(reg=>reg.update()).catch(()=>{});
 }
