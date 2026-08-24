@@ -131,4 +131,12 @@ el('copySummary').onclick=async()=>{await navigator.clipboard.writeText(summary(
 el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');};
 
 restore();renderRoles();renderPlants();renderSelection();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if('serviceWorker' in navigator){
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(refreshing)return;
+    refreshing=true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js?v=0.1.2').then(reg=>reg.update()).catch(()=>{});
+}
