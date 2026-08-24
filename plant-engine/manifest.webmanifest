@@ -1,0 +1,13 @@
+{
+  "name": "Plant Engine — Garden Consultant Workbench",
+  "short_name": "Plant Engine",
+  "description": "現地条件から植物候補と組み合わせを検証する、iPad向け植栽相談ツール",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1512",
+  "theme_color": "#18231e",
+  "orientation": "any",
+  "icons": [
+    {"src":"icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

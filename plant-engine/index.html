@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#18231e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Plant Engine" />
+    <title>Plant Engine</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">⌁</span>
+        <div>
+          <strong>PLANT ENGINE</strong>
+          <span>Garden Consultant Workbench</span>
+        </div>
+      </div>
+      <div class="case-title">
+        <label for="caseName">相談案件</label>
+        <input id="caseName" value="シダ植栽帯・葉の群生計画" />
+      </div>
+      <div class="top-actions">
+        <button class="ghost" id="newCase">新規案件</button>
+        <button class="primary" id="saveCase">保存</button>
+      </div>
+    </header>
+
+    <main class="workbench">
+      <section class="panel site-panel" aria-labelledby="siteHeading">
+        <div class="panel-heading">
+          <div><span class="eyebrow">01 / FIELD RECORD</span><h1 id="siteHeading">現地カルテ</h1></div>
+          <span class="status-dot">入力中</span>
+        </div>
+
+        <label class="photo-drop" for="photoInput">
+          <input id="photoInput" type="file" accept="image/*" capture="environment" />
+          <img id="photoPreview" alt="現地写真" hidden />
+          <span id="photoPrompt"><b>現地写真を追加</b><small>撮影またはフォトライブラリから選択</small></span>
+        </label>
+
+        <div class="field-grid">
+          <label><span>地域</span><input id="region" value="栃木県小山市" /></label>
+          <label><span>場所</span><input id="location" value="建物沿いの植栽帯" /></label>
+          <label><span>横幅</span><div class="unit-input"><input id="width" type="number" value="1.5" step="0.1" /><i>m</i></div></label>
+          <label><span>奥行</span><div class="unit-input"><input id="depth" type="number" value="0.4" step="0.1" /><i>m</i></div></label>
+        </div>
+
+        <fieldset>
+          <legend>日照</legend>
+          <div class="segmented" data-field="sun">
+            <button data-value="shade">日陰</button><button class="active" data-value="morning">午前のみ</button><button data-value="part">半日陰</button><button data-value="sun">日向</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>雨の翌日の土</legend>
+          <div class="segmented" data-field="moisture">
+            <button data-value="dry">乾く</button><button class="active" data-value="moist">適湿</button><button data-value="wet">かなり湿る</button>
+          </div>
+        </fieldset>
+
+        <div class="slider-row">
+          <label for="maxHeight">許容する高さ <output id="heightOutput">80cm</output></label>
+          <input id="maxHeight" type="range" min="20" max="150" value="80" step="10" />
+        </div>
+
+        <div class="subsection">
+          <div class="subheading"><h2>求める役割</h2><button class="text-button" id="clearRoles">解除</button></div>
+          <div class="chips" id="roleChips"></div>
+        </div>
+
+        <div class="subsection">
+          <h2>既存植物</h2>
+          <div class="existing-list">
+            <span>ギボウシ ‘Halcyon’ <b>1株</b></span>
+            <span>既存のシダ <b>半分残す</b></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel candidates-panel" aria-labelledby="candidateHeading">
+        <div class="panel-heading sticky-heading">
+          <div><span class="eyebrow">02 / PLANT INDEX</span><h1 id="candidateHeading">候補を抽出</h1></div>
+          <span class="result-count" id="resultCount">—</span>
+        </div>
+        <div class="search-row">
+          <input id="plantSearch" type="search" placeholder="名前・葉色・役割で検索" />
+          <select id="sortMode" aria-label="並び順"><option value="score">適合度順</option><option value="height">高さ順</option><option value="name">名前順</option></select>
+        </div>
+        <div class="legend"><span><i class="fit"></i>適合</span><span><i class="caution"></i>要確認</span><span><i class="reject"></i>条件外</span></div>
+        <div id="plantList" class="plant-list"></div>
+      </section>
+
+      <section class="panel plan-panel" aria-labelledby="planHeading">
+        <div class="panel-heading">
+          <div><span class="eyebrow">03 / COMBINATION LAB</span><h1 id="planHeading">組み合わせを検証</h1></div>
+          <button class="icon-button" id="clearSelection" title="選択を解除">↺</button>
+        </div>
+
+        <div class="site-meter">
+          <div class="meter-label"><span>推定占有量</span><strong id="occupancyText">0%</strong></div>
+          <div class="meter"><span id="occupancyBar"></span></div>
+          <small id="occupancyNote">候補を採用すると成長後の混雑を試算します。</small>
+        </div>
+
+        <div id="selectionEmpty" class="empty-state">
+          <span>＋</span><b>候補を採用してください</b><small>中央の植物カードから追加できます</small>
+        </div>
+        <div id="selectionList" class="selection-list"></div>
+
+        <div class="diagnostics">
+          <div class="subheading"><h2>検証結果</h2><span id="diagnosticScore">未検証</span></div>
+          <div id="diagnosticList" class="diagnostic-list">
+            <p>植物を2種類以上選ぶと、冬の構成・葉形・繁殖性・混雑を照合します。</p>
+          </div>
+        </div>
+
+        <div class="plan-actions">
+          <button class="ghost" id="copySummary">相談メモをコピー</button>
+          <button class="primary" id="makePlan">採用案を確定</button>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
