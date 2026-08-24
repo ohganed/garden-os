@@ -40,7 +40,16 @@ function scorePlant(p){
 }
 
 function renderRoles(){
-  el('roleChips').innerHTML=roles.map(([id,label])=>`<button class="chip ${state.roles.has(id)?'active':''}" data-role="${id}">${label}</button>`).join('');
+  const container=el('roleChips');
+  container.innerHTML=roles.map(([id,label])=>`<button type="button" class="chip ${state.roles.has(id)?'active':''}" data-role="${id}">${label}</button>`).join('');
+  container.querySelectorAll('[data-role]').forEach(button=>{
+    button.onclick=()=>{
+      const role=button.dataset.role;
+      state.roles.has(role)?state.roles.delete(role):state.roles.add(role);
+      renderRoles();
+      renderPlants();
+    };
+  });
 }
 
 function renderPlants(){
@@ -122,7 +131,6 @@ document.addEventListener('change',e=>{if(e.target.matches('[data-count]')){stat
 el('maxHeight').addEventListener('input',e=>{state.maxHeight=Number(e.target.value);el('heightOutput').textContent=`${state.maxHeight}cm`;renderPlants();});
 el('plantSearch').addEventListener('input',renderPlants);el('sortMode').addEventListener('change',renderPlants);
 el('photoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await storePhoto(f);showPhoto(f);toast('写真をこのiPad内に保存しました');}catch{toast('写真を保存できませんでした');}});
-el('roleChips').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;const r=b.dataset.role;state.roles.has(r)?state.roles.delete(r):state.roles.add(r);renderRoles();renderPlants();});
 el('clearRoles').onclick=()=>{state.roles.clear();renderRoles();renderPlants();};
 el('clearSelection').onclick=()=>{state.selected={};renderPlants();renderSelection();};
 el('saveCase').onclick=save;
@@ -138,5 +146,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.1.2').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.1.3').then(reg=>reg.update()).catch(()=>{});
 }
