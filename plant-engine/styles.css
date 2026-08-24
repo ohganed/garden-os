@@ -157,6 +157,7 @@ input[type="range"] { width:100%; accent-color:var(--green); }
 .concept-placeholder { display:grid;place-items:center;aspect-ratio:4/3;background:linear-gradient(145deg,#17231c,#101712);color:#52655a;font-size:25px;font-weight:800; }
 .concept-card>div:last-child { padding:7px; }.concept-card b { display:block;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }.concept-card small { display:block;margin-top:2px;color:var(--muted);font-size:8px; }
 .concept-card.has-image { border-style:solid;border-color:#58715f; }
+.comparison-board { grid-template-columns:1fr; }.comparison-card img { aspect-ratio:16/9; }.comparison-card .concept-placeholder { aspect-ratio:16/9; }
 .plan-actions { margin-top:16px; }
 .toast { position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:#e7f0e8;color:#172017;padding:11px 16px;border-radius:10px;font-weight:650;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:100; }
 .toast.show { opacity:1;transform:translate(-50%,0); }
@@ -191,6 +192,7 @@ input[type="range"] { width:100%; accent-color:var(--green); }
 .visual-upload-slot b { font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .visual-upload-slot label { display:block;padding:7px 5px;border-radius:7px;background:#2b4032;color:#dce9df;font-size:9px;cursor:pointer; }.visual-upload-slot input { display:none; }
 .visual-upload-slot button { padding:5px;border-color:#5d3b3e;background:#2d2022;color:#dcaeb1;font-size:8px; }
+.comparison-upload { grid-template-columns:1fr; }.comparison-slot img,.comparison-slot .upload-plus { aspect-ratio:16/9; }
 .timeline-divider { margin-top:10px;padding:16px;border-top:1px solid #405348;border-bottom:1px solid #405348;background:linear-gradient(90deg,rgba(73,100,83,.16),transparent); }.timeline-divider h3 { margin:5px 0;font-size:16px; }.timeline-divider p { margin:0;color:var(--muted);font-size:10px;line-height:1.55; }
 .growth-controls { display:grid;grid-template-columns:auto minmax(160px,1fr);align-items:center;gap:9px;margin-bottom:10px;padding:8px;border-radius:8px;background:#101712; }.growth-controls label { margin:0;font-size:10px; }.growth-controls select { width:100%;padding:8px;border:1px solid #3b5044;border-radius:7px;background:#17221c;color:var(--text);font-size:10px; }
 .growth-visuals { border-top-color:#4a5744; }.growth-board .concept-placeholder { color:#819567;font-size:19px; }

@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Plant Engine" />
     <title>Plant Engine</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.6.0" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.6.1" />
     <link rel="apple-touch-icon" href="icons/icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=0.6.0" />
+    <link rel="stylesheet" href="styles.css?v=0.6.1" />
   </head>
   <body>
     <header class="topbar">
@@ -127,7 +127,7 @@
 
         <section class="case-visuals" aria-labelledby="visualsHeading">
           <div class="subheading"><div><h2 id="visualsHeading">案件イメージ</h2><small>AIで得た外観案を、この端末の案件へ保存</small></div><button type="button" class="text-button" id="openVisualPlanner">作成する</button></div>
-          <div id="conceptBoard" class="concept-board"></div>
+          <div id="conceptBoard" class="concept-board comparison-board"></div>
         </section>
 
         <section class="case-visuals growth-visuals" aria-labelledby="growthHeading">
@@ -192,24 +192,24 @@
           </section>
           <section class="visual-step">
             <span class="step-number">3</span>
-            <div><h3>得られた画像を案件へ貼り付け</h3><p>画像を長押しで保存した後、下の5枠へ入れます。画像はGitHubへ送られず、この端末内だけに保存されます。</p><div id="visualUploadGrid" class="visual-upload-grid"></div></div>
+            <div><h3>5案比較図を案件へ貼り付け</h3><p>A〜Eが一枚にまとまった画像を保存します。画像はGitHubへ送られず、この端末内だけに保存されます。</p><div id="visualUploadGrid" class="visual-upload-grid comparison-upload"></div></div>
           </section>
           <section class="timeline-divider">
             <span class="eyebrow">GROWTH TIMELINE</span><h3>同じ配置の時間変化を作る</h3><p>採用した配置を固定し、季節・休眠・活着を考慮した5時点を比較します。これは確定予報ではなく、管理計画のための推定イメージです。</p>
           </section>
           <section class="visual-step prompt-step">
             <span class="step-number">4</span>
-            <div><div class="growth-controls"><label for="growthBasePlan">基準にする配置案</label><select id="growthBasePlan"><option value="A">A｜自然群生</option><option value="B">B｜リズム配置</option><option value="C">C｜立体レイヤー</option><option value="D">D｜焦点と余白</option><option value="E">E｜密度のある景観</option></select></div><div class="research-label-row"><label for="growthPrompt">5時点の成長予測プロンプト</label><button type="button" class="mini-button" id="buildGrowthPrompt">再生成</button></div><textarea id="growthPrompt" readonly></textarea><button type="button" class="primary visual-copy" id="copyGrowthPrompt">プロンプトをコピー</button></div>
+            <div><div class="growth-controls"><label for="growthStageSelect">作成する時点</label><select id="growthStageSelect"><option value="0">1か月後</option><option value="1">2か月後</option><option value="2">3か月後</option><option value="3">6か月後</option><option value="4">1年後</option></select></div><div class="research-label-row"><label for="growthPrompt">選択時点の5案比較図プロンプト</label><button type="button" class="mini-button" id="buildGrowthPrompt">再生成</button></div><textarea id="growthPrompt" readonly></textarea><button type="button" class="primary visual-copy" id="copyGrowthPrompt">プロンプトをコピー</button></div>
           </section>
           <section class="visual-step">
             <span class="step-number">5</span>
-            <div><h3>成長予測画像を案件へ保存</h3><p>AIへ現地写真と、基準にする配置案の画像を添付してください。得られた5時点を下へ保存します。</p><div id="growthUploadGrid" class="visual-upload-grid"></div></div>
+            <div><h3>成長予測画像を案件へ保存</h3><p>AIへ現地写真と最初の5案比較図を添付してください。時点ごとに生成した1枚を、対応する枠へ保存します。</p><div id="growthUploadGrid" class="visual-upload-grid"></div></div>
           </section>
         </div>
       </div>
     </dialog>
 
-    <script src="plant-candidates.js?v=0.6.0"></script>
-    <script src="app.js?v=0.6.0"></script>
+    <script src="plant-candidates.js?v=0.6.1"></script>
+    <script src="app.js?v=0.6.1"></script>
   </body>
 </html>

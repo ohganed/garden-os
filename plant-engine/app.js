@@ -52,6 +52,7 @@ const conceptPatterns=[
 ];
 const growthStages=[['1M','1か月後'],['2M','2か月後'],['3M','3か月後'],['6M','6か月後'],['1Y','1年後']];
 let conceptImages=Array(5).fill(null);
+let comparisonImage=null;
 let growthImages=Array(5).fill(null);
 let activeExistingPlacement=null;
 
@@ -351,7 +352,7 @@ function buildVisualPrompt(){
   const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／草丈約${p.height}cm・株張り約${p.spread}cm・${p.form}${p.provisional?'［寸法等は暫定値］':''}`).join('\n');
   const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}／${x.position?`写真左端から${Math.round(x.position.x)}%、上端から${Math.round(x.position.y)}%の位置を固定`:'写真で見える現在位置を固定（座標未指定）'}`).join('\n'):'- 既存植物なし';
   const patterns=conceptPatterns.map(([key,title,description])=>`${key}. ${title}：${description}`).join('\n');
-  const prompt=`添付した現地写真を基準に、次の採用植物だけを使った庭の完成外観イメージを、A〜Eの5枚の独立した画像として作成してください。
+  const prompt=`添付した現地写真を基準に、次の採用植物だけを使ったA〜Eの5配置案を、1枚の高解像度比較図として作成してください。
 
 【現地】
 - 案件名：${el('caseName').value}
@@ -378,11 +379,12 @@ ${patterns}
 3. 添付写真の建物、壁、窓、通路、縁石、地面の形、遠景、光の方向を維持する。
 4. 指定された横幅・奥行・高さ上限を守り、植物を実寸に近い比率で描く。
 5. 葉の形、葉色、株立ち、広がり方を植物ごとに区別し、同じような葉へ均一化しない。
-6. 植え付け約2〜3年後の、管理された自然な成長状態として描く。過密、巨大化、非現実的な花数を避ける。
-7. 写実的なガーデン写真。人、文字、ラベル、鉢、家具、装飾品は加えない。
-8. A〜Eはそれぞれ別画像で出力し、画像の外側の説明文で案名と配置意図を簡潔に示す。画像内には文字を入れない。
+6. 新規植物は植え付け直後の現実的な苗サイズで描く。成熟時の株張りを考慮して間隔を取るが、最初から成熟株へ巨大化させない。
+7. 写実的なガーデン写真。人、鉢、家具、装飾品は加えない。
+8. 出力は必ず1枚だけとし、上段A・B・C、下段D・Eの順で、同じ大きさ・同じ縦横比の5パネルに分割する。各パネル上部に小さくA〜Eと案名を表示し、現地写真と同じカメラ位置・画角を使う。
+9. 5パネルを混ぜた一つの庭にせず、比較可能な5つの独立案として明確に区切る。
 
-最初にA〜Eの構成差を短く整理し、その後5枚を順番に生成してください。`;
+最初にA〜Eの構成差を短く整理し、その後、5案をまとめた比較図を1枚だけ生成してください。`;
   el('visualPrompt').value=prompt;
   return prompt;
 }
@@ -401,9 +403,8 @@ function buildGrowthPrompt(){
   if(!entries.length){toast('先に採用する植物を選んでください');return '';}
   const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／成熟草丈約${p.height}cm・成熟株張り約${p.spread}cm／冬姿:${winterLabel[p.winter]}／広がり:${spreadLabel[p.spreadType]}${p.provisional?'［基礎データは暫定・要検証］':''}`).join('\n');
   const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}／${x.position?`写真左端から${Math.round(x.position.x)}%、上端から${Math.round(x.position.y)}%`:'写真内の現在位置'}`).join('\n'):'- 既存植物なし';
-  const baseKey=el('growthBasePlan').value||'A',base=conceptPatterns.find(x=>x[0]===baseKey)||conceptPatterns[0];
-  const stages=[1,2,3,6,12].map((months,index)=>{const date=dateAfterMonths(months);return `${growthStages[index][1]}（${stageDate(months)}・${seasonForMonth(date.getMonth()+1)}）`;}).join('\n');
-  const prompt=`添付する2枚の画像、①現在の現地写真、②採用済みの配置案${base[0]}「${base[1]}」を基準に、同じ庭・同じ配置の時間変化を5枚の独立画像で予測してください。
+  const slot=Math.max(0,Math.min(4,Number(el('growthStageSelect').value)||0)),months=[1,2,3,6,12][slot],targetDate=dateAfterMonths(months),stage=growthStages[slot];
+  const prompt=`添付する2枚の画像、①現在の現地写真、②A〜Eの5配置案をまとめた植え付け直後の比較図を基準に、${stage[1]}（${stageDate(months)}・${seasonForMonth(targetDate.getMonth()+1)}）の状態を、1枚の5案比較図として予測してください。
 
 【植栽条件】
 - 地域：${el('region').value}
@@ -420,20 +421,21 @@ ${existing}
 【新たに植える植物】
 ${selected}
 
-【出力する5時点】
-${stages}
+【今回出力する時点】
+- ${stage[1]}：${stageDate(months)}（${seasonForMonth(targetDate.getMonth()+1)}）
 
 【成長推定の規則】
-1. 5枚すべてでカメラ位置、画角、建物、縁石、地形、既存植物の座標、新規植物の植え付け位置と株数を完全に固定する。
-2. 時間経過で変えてよいのは、各植物の活着、草丈、株幅、葉数、花、季節色、落葉・休眠だけとする。植物を追加・消去・移動しない。
-3. 1か月後は活着途中として急激に巨大化させない。2〜3か月後は季節と生育速度に応じた変化、6か月後は季節が変わる場合の落葉・休眠・地上部消失も正直に描く。1年後は同じ季節に戻った定着株であり、成熟株の最大サイズにはしない。
-4. 常緑・半常緑・落葉性、開花期、暑さ寒さ、関東の梅雨と夏、冬の休眠を植物ごとに区別する。季節外れの花や一年中同じ姿を描かない。
-5. 地下茎・ランナー型は緩やかな被覆拡大、株立ちは株の中心を保った肥大として表現する。隣株との競合と空隙も現実的に示す。
-6. 暫定データの植物は断定的に誇張せず、一般的な成長幅の中間値で描く。不確実な点は画像外の説明で示す。
-7. 写実的な定点観測写真。人、文字、ラベル、鉢、家具、装飾品を加えない。画像内に月数を書かない。
-8. 各画像の外側に、対象日、季節、各植物の推定草丈・株幅、開花または休眠状態、混雑・剪定・株分けの注意を短く添える。
+1. 出力は必ず1枚だけとし、元画像と同じ上段A・B・C、下段D・Eの順序、同じ大きさ・同じ縦横比の5パネルに分割する。A〜E以外のパネルや別時点を追加しない。
+2. 各パネルは元のA〜Eと同じカメラ位置、画角、建物、縁石、地形、既存植物の座標、新規植物の植え付け位置と株数を完全に固定する。
+3. 時間経過で変えてよいのは、各植物の活着、草丈、株幅、葉数、花、季節色、落葉・休眠だけとする。植物を追加・消去・移動しない。
+4. ${stage[1]}として現実的に描く。1か月なら活着途中で急激に巨大化させず、2〜3か月なら季節と生育速度に応じ、6か月なら季節が変わる場合の落葉・休眠・地上部消失も正直に描き、1年なら同じ季節に戻った定着株だが成熟最大サイズにはしない。
+5. 常緑・半常緑・落葉性、開花期、暑さ寒さ、関東の梅雨と夏、冬の休眠を植物ごとに区別する。季節外れの花や一年中同じ姿を描かない。
+6. 地下茎・ランナー型は緩やかな被覆拡大、株立ちは株の中心を保った肥大として表現する。隣株との競合と空隙も現実的に示す。
+7. 暫定データの植物は断定的に誇張せず、一般的な成長幅の中間値で描く。不確実な点は画像外の説明で示す。
+8. 写実的な定点観測比較図。各パネル上部にA〜Eを小さく表示し、図全体には「${stage[1]}」と対象日を表示する。人、鉢、家具、装飾品を加えない。
+9. 画像の前後に、各植物の推定草丈・株幅、開花または休眠状態、混雑・剪定・株分けの注意を短く説明する。
 
-最初に5時点の変化を表で整理し、その後、同一構図の5枚を時系列順に生成してください。これは生育保証ではなく、管理判断用の推定シナリオとして扱ってください。`;
+この時点以外の画像は作らず、A〜Eをまとめた比較図を1枚だけ生成してください。これは生育保証ではなく、管理判断用の推定シナリオとして扱ってください。`;
   el('growthPrompt').value=prompt;return prompt;
 }
 
@@ -452,13 +454,13 @@ function compressConceptImage(file){
 
 function conceptImageUrl(blob){return blob?URL.createObjectURL(blob):'';}
 function releaseConceptUrls(container){container.querySelectorAll('img[data-object-url]').forEach(img=>URL.revokeObjectURL(img.dataset.objectUrl));}
-function conceptCard(slot,mode){
-  const [key,title]=conceptPatterns[slot],blob=conceptImages[slot],url=conceptImageUrl(blob);
-  if(mode==='upload')return `<div class="visual-upload-slot ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${key}案 ${title}">`:'<span class="upload-plus">＋</span>'}<b>${key}｜${title}</b><label><input type="file" accept="image/*" data-concept-upload="${slot}">${blob?'画像を変更':'画像を選ぶ'}</label>${blob?`<button type="button" data-concept-delete="${slot}">削除</button>`:''}</div>`;
-  return `<article class="concept-card ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${key}案 ${title}">`:'<div class="concept-placeholder">${key}</div>'}<div><b>${key}｜${title}</b><small>${blob?'端末内に保存済み':'まだ画像がありません'}</small></div></article>`;
+function comparisonCard(mode){
+  const blob=comparisonImage,url=conceptImageUrl(blob);
+  if(mode==='upload')return `<div class="visual-upload-slot comparison-slot ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="A〜E 5配置案比較図">`:'<span class="upload-plus">A–E</span>'}<b>A〜E｜5配置案比較図</b><label><input type="file" accept="image/*" data-comparison-upload>${blob?'画像を変更':'比較図を選ぶ'}</label>${blob?'<button type="button" data-comparison-delete>削除</button>':''}</div>`;
+  return `<article class="concept-card comparison-card ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="A〜E 5配置案比較図">`:'<div class="concept-placeholder">A–E</div>'}<div><b>5配置案比較図</b><small>${blob?'端末内に保存済み':'まだ画像がありません'}</small></div></article>`;
 }
-function renderVisualUploadGrid(){const container=el('visualUploadGrid');releaseConceptUrls(container);container.innerHTML=conceptPatterns.map((_,i)=>conceptCard(i,'upload')).join('');}
-function renderConceptBoard(){const container=el('conceptBoard');releaseConceptUrls(container);container.innerHTML=conceptPatterns.map((_,i)=>conceptCard(i,'board')).join('');}
+function renderVisualUploadGrid(){const container=el('visualUploadGrid');releaseConceptUrls(container);container.innerHTML=comparisonCard('upload');}
+function renderConceptBoard(){const container=el('conceptBoard');releaseConceptUrls(container);container.innerHTML=comparisonCard('board');}
 function growthCard(slot,mode){
   const [key,title]=growthStages[slot],blob=growthImages[slot],url=conceptImageUrl(blob);
   if(mode==='upload')return `<div class="visual-upload-slot ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${title}">`:'<span class="upload-plus">＋</span>'}<b>${key}｜${title}</b><label><input type="file" accept="image/*" data-growth-upload="${slot}">${blob?'画像を変更':'画像を選ぶ'}</label>${blob?`<button type="button" data-growth-delete="${slot}">削除</button>`:''}</div>`;
@@ -482,6 +484,9 @@ async function deletePhoto(){const db=await openPhotoDb();return new Promise((re
 async function storeConceptImage(slot,blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').put(blob,`current-case-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 async function loadConceptImages(){const db=await openPhotoDb();return Promise.all(conceptPatterns.map((_,slot)=>new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readonly');const req=tx.objectStore('concept-images').get(`current-case-${slot}`);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);}))).finally(()=>db.close());}
 async function deleteConceptImage(slot){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').delete(`current-case-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function storeComparisonImage(blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').put(blob,'current-case-comparison');tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function loadComparisonImage(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readonly'),store=tx.objectStore('concept-images'),current=store.get('current-case-comparison');current.onsuccess=()=>{if(current.result){db.close();resolve(current.result);return;}const legacy=store.get('current-case-0');legacy.onsuccess=()=>{db.close();resolve(legacy.result||null);};legacy.onerror=()=>reject(legacy.error);};current.onerror=()=>reject(current.error);});}
+async function deleteComparisonImage(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite'),store=tx.objectStore('concept-images');store.delete('current-case-comparison');conceptPatterns.forEach((_,slot)=>store.delete(`current-case-${slot}`));tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 async function storeGrowthImage(slot,blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').put(blob,`current-case-growth-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 async function loadGrowthImages(){const db=await openPhotoDb();return Promise.all(growthStages.map((_,slot)=>new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readonly');const req=tx.objectStore('concept-images').get(`current-case-growth-${slot}`);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);}))).finally(()=>db.close());}
 async function deleteGrowthImage(slot){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').delete(`current-case-growth-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
@@ -489,20 +494,20 @@ async function deleteAllConceptImages(){const db=await openPhotoDb();return new 
 function showPhoto(blob){if(!blob)return;const old=el('photoPreview').dataset.objectUrl;if(old)URL.revokeObjectURL(old);const url=URL.createObjectURL(blob);el('photoPreview').dataset.objectUrl=url;el('photoPreview').src=url;el('photoPreview').hidden=false;el('photoPrompt').hidden=true;el('photoReplace').hidden=false;renderPhotoMarkers();}
 
 function save(){const data={caseName:el('caseName').value,region:el('region').value,location:el('location').value,width:el('width').value,depth:el('depth').value,plantingDate:el('plantingDate').value,sun:state.sun,moisture:state.moisture,maxHeight:state.maxHeight,selected:state.selected,roles:[...state.roles],existing:state.existing};localStorage.setItem('plant-engine-case',JSON.stringify(data));toast('相談案件をiPad内に保存しました');}
-async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth','plantingDate'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[]),existing:(d.existing||[]).map(x=>({...x,position:x.position||null}))});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const [photo,concepts,growth]=await Promise.all([loadPhoto(),loadConceptImages(),loadGrowthImages()]);if(photo)showPhoto(photo);conceptImages=concepts;growthImages=growth;renderConceptBoard();renderGrowthBoard();}catch{renderConceptBoard();renderGrowthBoard();}}
+async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth','plantingDate'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[]),existing:(d.existing||[]).map(x=>({...x,position:x.position||null}))});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const [photo,comparison,growth]=await Promise.all([loadPhoto(),loadComparisonImage(),loadGrowthImages()]);if(photo)showPhoto(photo);comparisonImage=comparison;growthImages=growth;renderConceptBoard();renderGrowthBoard();}catch{renderConceptBoard();renderGrowthBoard();}}
 
 document.addEventListener('click',e=>{
   const seg=e.target.closest('.segmented button');if(seg){const g=seg.parentElement;g.querySelectorAll('button').forEach(b=>b.classList.remove('active'));seg.classList.add('active');state[g.dataset.field]=seg.dataset.value;renderPlants();return;}
   const select=e.target.closest('[data-select]');if(select){const id=select.dataset.select;state.selected[id]?delete state.selected[id]:state.selected[id]=1;renderPlants();renderSelection();return;}
   const remove=e.target.closest('[data-remove]');if(remove){delete state.selected[remove.dataset.remove];renderPlants();renderSelection();}
-  const conceptDelete=e.target.closest('[data-concept-delete]');if(conceptDelete){const slot=Number(conceptDelete.dataset.conceptDelete);deleteConceptImage(slot).then(()=>{conceptImages[slot]=null;renderVisualUploadGrid();renderConceptBoard();toast(`${conceptPatterns[slot][0]}案の画像を削除しました`);}).catch(()=>toast('画像を削除できませんでした'));}
+  const comparisonDelete=e.target.closest('[data-comparison-delete]');if(comparisonDelete){deleteComparisonImage().then(()=>{comparisonImage=null;renderVisualUploadGrid();renderConceptBoard();toast('5配置案比較図を削除しました');}).catch(()=>toast('画像を削除できませんでした'));}
   const growthDelete=e.target.closest('[data-growth-delete]');if(growthDelete){const slot=Number(growthDelete.dataset.growthDelete);deleteGrowthImage(slot).then(()=>{growthImages[slot]=null;renderGrowthUploadGrid();renderGrowthBoard();toast(`${growthStages[slot][1]}の画像を削除しました`);}).catch(()=>toast('画像を削除できませんでした'));}
   const marker=e.target.closest('[data-marker-id]');if(marker&&!activeExistingPlacement){startExistingPlacement(marker.dataset.markerId);}
 });
 document.addEventListener('change',async e=>{
   if(e.target.matches('[data-count]')){state.selected[e.target.dataset.count]=Math.max(1,Number(e.target.value));renderSelection();}
   if(['width','depth'].includes(e.target.id))renderSelection();
-  if(e.target.matches('[data-concept-upload]')){const file=e.target.files?.[0];if(!file)return;const slot=Number(e.target.dataset.conceptUpload);try{const blob=await compressConceptImage(file);await storeConceptImage(slot,blob);conceptImages[slot]=blob;renderVisualUploadGrid();renderConceptBoard();toast(`${conceptPatterns[slot][0]}案を案件へ保存しました`);}catch{toast('画像を保存できませんでした');}}
+  if(e.target.matches('[data-comparison-upload]')){const file=e.target.files?.[0];if(!file)return;try{const blob=await compressConceptImage(file);await storeComparisonImage(blob);comparisonImage=blob;renderVisualUploadGrid();renderConceptBoard();toast('5配置案比較図を案件へ保存しました');}catch{toast('画像を保存できませんでした');}}
   if(e.target.matches('[data-growth-upload]')){const file=e.target.files?.[0];if(!file)return;const slot=Number(e.target.dataset.growthUpload);try{const blob=await compressConceptImage(file);await storeGrowthImage(slot,blob);growthImages[slot]=blob;renderGrowthUploadGrid();renderGrowthBoard();toast(`${growthStages[slot][1]}を案件へ保存しました`);}catch{toast('画像を保存できませんでした');}}
 });
 el('maxHeight').addEventListener('input',e=>{state.maxHeight=Number(e.target.value);el('heightOutput').textContent=`${state.maxHeight}cm`;renderPlants();});
@@ -525,7 +530,7 @@ el('closeVisualPlanner').onclick=()=>{const dialog=el('visualDialog');typeof dia
 el('buildVisualPrompt').onclick=buildVisualPrompt;
 el('copyVisualPrompt').onclick=async()=>{const prompt=el('visualPrompt').value||buildVisualPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('5案生成用プロンプトをコピーしました');}catch{el('visualPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
 el('buildGrowthPrompt').onclick=buildGrowthPrompt;
-el('growthBasePlan').addEventListener('change',buildGrowthPrompt);
+el('growthStageSelect').addEventListener('change',buildGrowthPrompt);
 el('copyGrowthPrompt').onclick=async()=>{const prompt=el('growthPrompt').value||buildGrowthPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('成長予測プロンプトをコピーしました');}catch{el('growthPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
 el('openResearch').onclick=()=>{renderCustomPlantList();const dialog=el('researchDialog');typeof dialog.showModal==='function'?dialog.showModal():dialog.setAttribute('open','');};
 el('closeResearch').onclick=()=>{const dialog=el('researchDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
@@ -544,5 +549,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.6.0').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.6.1').then(reg=>reg.update()).catch(()=>{});
 }
