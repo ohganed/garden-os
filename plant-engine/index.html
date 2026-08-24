@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Plant Engine" />
     <title>Plant Engine</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.6.1" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.6.2" />
     <link rel="apple-touch-icon" href="icons/icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=0.6.1" />
+    <link rel="stylesheet" href="styles.css?v=0.6.2" />
   </head>
   <body>
     <header class="topbar">
@@ -188,7 +188,7 @@
           </section>
           <section class="visual-step prompt-step">
             <span class="step-number">2</span>
-            <div><div class="research-label-row"><label for="visualPrompt">5案生成用プロンプト</label><button type="button" class="mini-button" id="buildVisualPrompt">再生成</button></div><textarea id="visualPrompt" readonly></textarea><button type="button" class="primary visual-copy" id="copyVisualPrompt">プロンプトをコピー</button></div>
+            <div><div class="render-style-picker"><label for="visualStyle">生成する表現</label><select id="visualStyle"><option value="sketch">設計スケッチ｜高速・比較向け</option><option value="photo">写真調｜最終確認向け</option></select><small id="visualStyleNote">現実に近い植物色を保った、色鉛筆＋淡い水彩の設計パース</small></div><div class="research-label-row"><label for="visualPrompt">5案生成用プロンプト</label><button type="button" class="mini-button" id="buildVisualPrompt">再生成</button></div><textarea id="visualPrompt" readonly></textarea><button type="button" class="primary visual-copy" id="copyVisualPrompt">プロンプトをコピー</button></div>
           </section>
           <section class="visual-step">
             <span class="step-number">3</span>
@@ -209,7 +209,7 @@
       </div>
     </dialog>
 
-    <script src="plant-candidates.js?v=0.6.1"></script>
-    <script src="app.js?v=0.6.1"></script>
+    <script src="plant-candidates.js?v=0.6.2"></script>
+    <script src="app.js?v=0.6.2"></script>
   </body>
 </html>

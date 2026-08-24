@@ -51,10 +51,18 @@ const conceptPatterns=[
   ['E','密度のある景観','成長後の混み合いを避けつつ、植え付け直後から群生感が出るよう配置する']
 ];
 const growthStages=[['1M','1か月後'],['2M','2か月後'],['3M','3か月後'],['6M','6か月後'],['1Y','1年後']];
+const VISUAL_STYLE_KEY='plant-engine-visual-style-v1';
 let conceptImages=Array(5).fill(null);
 let comparisonImage=null;
 let growthImages=Array(5).fill(null);
 let activeExistingPlacement=null;
+
+function visualStyleSpec(){
+  return el('visualStyle').value==='photo'
+    ?{name:'写真調',note:'自然な光と現実的な色の、誇張を抑えた完成予想写真',instruction:'自然な写真調のガーデン・ビジュアライゼーション。現実的な昼光、植物本来の色、自然な陰影を使い、過剰なHDR、強すぎる彩度、広告写真風の誇張、非現実的な花数を避ける。'}
+    :{name:'設計スケッチ',note:'現実に近い植物色を保った、色鉛筆＋淡い水彩の設計パース',instruction:'ガーデンデザイナーによる着彩設計スケッチ。色鉛筆の輪郭と淡い透明水彩を組み合わせ、植物の葉色・花色は現実に近く、草丈・株張り・葉形の比率は正確に描く。建物と背景は軽く簡略化するが、漫画調、記号的な植物、白黒線画、過度なデフォルメにはしない。'};
+}
+function updateVisualStyleUi(){const style=visualStyleSpec();el('visualStyleNote').textContent=style.note;localStorage.setItem(VISUAL_STYLE_KEY,el('visualStyle').value);}
 
 function loadCustomPlants(){
   try{
@@ -352,7 +360,11 @@ function buildVisualPrompt(){
   const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／草丈約${p.height}cm・株張り約${p.spread}cm・${p.form}${p.provisional?'［寸法等は暫定値］':''}`).join('\n');
   const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}／${x.position?`写真左端から${Math.round(x.position.x)}%、上端から${Math.round(x.position.y)}%の位置を固定`:'写真で見える現在位置を固定（座標未指定）'}`).join('\n'):'- 既存植物なし';
   const patterns=conceptPatterns.map(([key,title,description])=>`${key}. ${title}：${description}`).join('\n');
-  const prompt=`添付した現地写真を基準に、次の採用植物だけを使ったA〜Eの5配置案を、1枚の高解像度比較図として作成してください。
+  const style=visualStyleSpec();
+  const prompt=`添付した現地写真を基準に、次の採用植物だけを使ったA〜Eの5配置案を、${style.name}による1枚の高解像度比較図として作成してください。
+
+【表現形式】
+${style.instruction}
 
 【現地】
 - 案件名：${el('caseName').value}
@@ -380,7 +392,7 @@ ${patterns}
 4. 指定された横幅・奥行・高さ上限を守り、植物を実寸に近い比率で描く。
 5. 葉の形、葉色、株立ち、広がり方を植物ごとに区別し、同じような葉へ均一化しない。
 6. 新規植物は植え付け直後の現実的な苗サイズで描く。成熟時の株張りを考慮して間隔を取るが、最初から成熟株へ巨大化させない。
-7. 写実的なガーデン写真。人、鉢、家具、装飾品は加えない。
+7. 上記の${style.name}を全パネルで統一する。人、鉢、家具、装飾品は加えない。
 8. 出力は必ず1枚だけとし、上段A・B・C、下段D・Eの順で、同じ大きさ・同じ縦横比の5パネルに分割する。各パネル上部に小さくA〜Eと案名を表示し、現地写真と同じカメラ位置・画角を使う。
 9. 5パネルを混ぜた一つの庭にせず、比較可能な5つの独立案として明確に区切る。
 
@@ -404,7 +416,11 @@ function buildGrowthPrompt(){
   const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／成熟草丈約${p.height}cm・成熟株張り約${p.spread}cm／冬姿:${winterLabel[p.winter]}／広がり:${spreadLabel[p.spreadType]}${p.provisional?'［基礎データは暫定・要検証］':''}`).join('\n');
   const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}／${x.position?`写真左端から${Math.round(x.position.x)}%、上端から${Math.round(x.position.y)}%`:'写真内の現在位置'}`).join('\n'):'- 既存植物なし';
   const slot=Math.max(0,Math.min(4,Number(el('growthStageSelect').value)||0)),months=[1,2,3,6,12][slot],targetDate=dateAfterMonths(months),stage=growthStages[slot];
-  const prompt=`添付する2枚の画像、①現在の現地写真、②A〜Eの5配置案をまとめた植え付け直後の比較図を基準に、${stage[1]}（${stageDate(months)}・${seasonForMonth(targetDate.getMonth()+1)}）の状態を、1枚の5案比較図として予測してください。
+  const style=visualStyleSpec();
+  const prompt=`添付する2枚の画像、①現在の現地写真、②A〜Eの5配置案をまとめた植え付け直後の比較図を基準に、${stage[1]}（${stageDate(months)}・${seasonForMonth(targetDate.getMonth()+1)}）の状態を、${style.name}による1枚の5案比較図として予測してください。
+
+【表現形式】
+${style.instruction}
 
 【植栽条件】
 - 地域：${el('region').value}
@@ -432,7 +448,7 @@ ${selected}
 5. 常緑・半常緑・落葉性、開花期、暑さ寒さ、関東の梅雨と夏、冬の休眠を植物ごとに区別する。季節外れの花や一年中同じ姿を描かない。
 6. 地下茎・ランナー型は緩やかな被覆拡大、株立ちは株の中心を保った肥大として表現する。隣株との競合と空隙も現実的に示す。
 7. 暫定データの植物は断定的に誇張せず、一般的な成長幅の中間値で描く。不確実な点は画像外の説明で示す。
-8. 写実的な定点観測比較図。各パネル上部にA〜Eを小さく表示し、図全体には「${stage[1]}」と対象日を表示する。人、鉢、家具、装飾品を加えない。
+8. 上記の${style.name}を全パネルと全時点で統一する。各パネル上部にA〜Eを小さく表示し、図全体には「${stage[1]}」と対象日を表示する。人、鉢、家具、装飾品を加えない。
 9. 画像の前後に、各植物の推定草丈・株幅、開花または休眠状態、混雑・剪定・株分けの注意を短く説明する。
 
 この時点以外の画像は作らず、A〜Eをまとめた比較図を1枚だけ生成してください。これは生育保証ではなく、管理判断用の推定シナリオとして扱ってください。`;
@@ -529,6 +545,7 @@ el('openGrowthPlanner').onclick=()=>{openVisualPlanner();setTimeout(()=>el('grow
 el('closeVisualPlanner').onclick=()=>{const dialog=el('visualDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
 el('buildVisualPrompt').onclick=buildVisualPrompt;
 el('copyVisualPrompt').onclick=async()=>{const prompt=el('visualPrompt').value||buildVisualPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('5案生成用プロンプトをコピーしました');}catch{el('visualPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
+el('visualStyle').addEventListener('change',()=>{updateVisualStyleUi();if(Object.keys(state.selected).length){buildVisualPrompt();buildGrowthPrompt();}toast(`${visualStyleSpec().name}へ切り替えました`);});
 el('buildGrowthPrompt').onclick=buildGrowthPrompt;
 el('growthStageSelect').addEventListener('change',buildGrowthPrompt);
 el('copyGrowthPrompt').onclick=async()=>{const prompt=el('growthPrompt').value||buildGrowthPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('成長予測プロンプトをコピーしました');}catch{el('growthPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
@@ -540,6 +557,7 @@ el('registerPlant').onclick=registerResearchPlant;
 el('researchDialog').addEventListener('click',event=>{if(event.target===el('researchDialog'))el('closeResearch').click();});
 el('visualDialog').addEventListener('click',event=>{if(event.target===el('visualDialog'))el('closeVisualPlanner').click();});
 
+const savedVisualStyle=localStorage.getItem(VISUAL_STYLE_KEY);if(['sketch','photo'].includes(savedVisualStyle))el('visualStyle').value=savedVisualStyle;updateVisualStyleUi();
 el('plantingDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
 renderConceptBoard();renderGrowthBoard();restore();renderRoles();renderExisting();renderCustomPlantList();renderPlants();renderSelection();
 if('serviceWorker' in navigator){
@@ -549,5 +567,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.6.1').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.6.2').then(reg=>reg.update()).catch(()=>{});
 }
