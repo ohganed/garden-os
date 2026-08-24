@@ -191,7 +191,15 @@ function parseResearchJson(text){
   let cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
   const first=cleaned.indexOf('{'),last=cleaned.lastIndexOf('}');
   if(first>=0&&last>first)cleaned=cleaned.slice(first,last+1);
-  return JSON.parse(cleaned);
+  try{return JSON.parse(cleaned);}
+  catch(firstError){
+    const repaired=cleaned
+      .replace(/[\u201c\u201d\u201e\u201f]/g,'"')
+      .replace(/\u00a0/g,' ')
+      .replace(/[\u200b\u200c\u200d\ufeff]/g,'');
+    if(repaired===cleaned)throw firstError;
+    return JSON.parse(repaired);
+  }
 }
 
 function renderCustomPlantList(){
@@ -341,5 +349,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.3.1').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.3.2').then(reg=>reg.update()).catch(()=>{});
 }
