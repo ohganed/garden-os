@@ -39,9 +39,8 @@ function scorePlant(p){
   return {score:Math.max(0,Math.min(100,score)),issues,matched};
 }
 
-function initRoles(){
+function renderRoles(){
   el('roleChips').innerHTML=roles.map(([id,label])=>`<button class="chip ${state.roles.has(id)?'active':''}" data-role="${id}">${label}</button>`).join('');
-  el('roleChips').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;const r=b.dataset.role;state.roles.has(r)?state.roles.delete(r):state.roles.add(r);initRoles();renderPlants();});
 }
 
 function renderPlants(){
@@ -123,12 +122,13 @@ document.addEventListener('change',e=>{if(e.target.matches('[data-count]')){stat
 el('maxHeight').addEventListener('input',e=>{state.maxHeight=Number(e.target.value);el('heightOutput').textContent=`${state.maxHeight}cm`;renderPlants();});
 el('plantSearch').addEventListener('input',renderPlants);el('sortMode').addEventListener('change',renderPlants);
 el('photoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await storePhoto(f);showPhoto(f);toast('写真をこのiPad内に保存しました');}catch{toast('写真を保存できませんでした');}});
-el('clearRoles').onclick=()=>{state.roles.clear();initRoles();renderPlants();};
+el('roleChips').addEventListener('click',e=>{const b=e.target.closest('[data-role]');if(!b)return;const r=b.dataset.role;state.roles.has(r)?state.roles.delete(r):state.roles.add(r);renderRoles();renderPlants();});
+el('clearRoles').onclick=()=>{state.roles.clear();renderRoles();renderPlants();};
 el('clearSelection').onclick=()=>{state.selected={};renderPlants();renderSelection();};
 el('saveCase').onclick=save;
 el('newCase').onclick=async()=>{if(confirm('現在の入力を消して新しい案件を始めますか？')){localStorage.removeItem('plant-engine-case');await deletePhoto();location.reload();}};
 el('copySummary').onclick=async()=>{await navigator.clipboard.writeText(summary());toast('相談メモをコピーしました');};
 el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');};
 
-restore();initRoles();renderPlants();renderSelection();
+restore();renderRoles();renderPlants();renderSelection();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
