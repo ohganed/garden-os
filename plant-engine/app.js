@@ -16,10 +16,12 @@ const builtInPlants = [
   {id:'imperata',name:'ベニチガヤ',latin:'Imperata cylindrica ‘Rubra’',height:50,spread:50,sun:['sun','part'],moisture:['moist','dry'],winter:'deciduous',roles:['red','vertical'],colors:['赤','緑'],form:'直立する細葉',spreadType:'runner',icon:'⌇',tone:'#703d38',reason:'赤い細葉だが、色を保つにはより強い日照が必要。'},
   {id:'liriope',name:'ヤブラン',latin:'Liriope muscari',height:45,spread:40,sun:['shade','morning','part','sun'],moisture:['moist','dry'],winter:'evergreen',roles:['vertical','winter','flower'],colors:['濃緑'],form:'線形葉',spreadType:'clump',icon:'〽',tone:'#304736',reason:'丈夫な常緑の細葉。既存のシダの間に安定した線をつくる。'}
 ];
+builtInPlants.forEach(plant=>Object.assign(plant,{origin:'core',databaseTier:'CORE',provisional:false,confidence:'high'}));
+const candidatePlants=Array.isArray(window.PLANT_CANDIDATES)?window.PLANT_CANDIDATES:[];
 
 const CUSTOM_PLANTS_KEY='plant-engine-custom-plants-v1';
 let customPlants=loadCustomPlants();
-let plants=[...builtInPlants,...customPlants];
+let plants=[...builtInPlants,...candidatePlants,...customPlants];
 
 const roles = [
   ['winter','冬も葉を残す'],['dark','黒・濃色'],['blue','青緑・銀青'],['wine','ワイン色'],['camel','キャメル'],['vertical','細長い葉'],['broad','大きな葉'],['small','小型植物'],['ground','地表を覆う'],['flower','季節の花'],['texture','異なる葉形']
@@ -27,6 +29,7 @@ const roles = [
 
 const state = {
   sun:'morning', moisture:'moist', maxHeight:80,
+  visibleLimit:60,
   roles:new Set(['winter','dark','blue','wine','camel','vertical','broad','small','texture']),
   selected:{},
   existing:[
@@ -49,7 +52,7 @@ function loadCustomPlants(){
 }
 function persistCustomPlants(){
   localStorage.setItem(CUSTOM_PLANTS_KEY,JSON.stringify(customPlants));
-  plants=[...builtInPlants,...customPlants];
+  plants=[...builtInPlants,...candidatePlants,...customPlants];
 }
 function escapeHtml(value=''){
   return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
@@ -230,19 +233,28 @@ function registerResearchPlant(){
 
 function renderPlants(){
   const q=el('plantSearch').value.trim().toLowerCase();
-  let rows=plants.map(p=>({...p,...scorePlant(p)})).filter(p=>!q||[p.name,p.latin,p.form,...p.colors,...p.roles].join(' ').toLowerCase().includes(q));
+  const databaseFilter=el('databaseFilter').value;
+  let rows=plants.map(p=>({...p,...scorePlant(p)})).filter(p=>{
+    const inDatabase=databaseFilter==='all'||p.origin===databaseFilter;
+    return inDatabase&&(!q||[p.name,p.latin,p.form,...p.colors,...p.roles,p.plantType||''].join(' ').toLowerCase().includes(q));
+  });
   const sort=el('sortMode').value;
   rows.sort(sort==='height'?(a,b)=>a.height-b.height:sort==='name'?(a,b)=>a.name.localeCompare(b.name,'ja'):(a,b)=>b.score-a.score);
   const counts=rows.reduce((n,p)=>{p.score>=80?n.fit++:p.score>=55?n.caution++:n.reject++;return n;},{fit:0,caution:0,reject:0});
-  el('resultCount').textContent=`適合 ${counts.fit}｜要確認 ${counts.caution}｜条件外 ${counts.reject}`;
-  el('plantList').innerHTML=rows.map(p=>{
+  const visibleRows=rows.slice(0,state.visibleLimit);
+  el('resultCount').textContent=`${rows.length}件中${visibleRows.length}件表示｜適合 ${counts.fit}｜要確認 ${counts.caution}｜条件外 ${counts.reject}`;
+  el('loadMore').hidden=visibleRows.length>=rows.length;
+  el('loadMore').textContent=`さらに表示（残り${Math.max(0,rows.length-visibleRows.length)}件）`;
+  el('plantList').innerHTML=visibleRows.map(p=>{
     const grade=p.score>=80?'fit':p.score>=55?'caution':'reject';
-    const gradeName={fit:'適合',caution:'要確認',reject:'条件外'}[grade];
+    const gradeName=p.provisional?{fit:'仮適合',caution:'仮確認',reject:'条件外'}[grade]:{fit:'適合',caution:'要確認',reject:'条件外'}[grade];
     const matchedRoles=p.roles.filter(r=>state.roles.has(r)).map(r=>roleLabel[r]);
     const judgement=p.issues.length?p.issues.join('／'):p.reason;
+    const databaseBadge=p.origin==='custom'?'<span class="local-badge">端末DB</span>':p.origin==='candidate'?'<span class="candidate-badge">候補DB・暫定</span>':'<span class="core-badge">確認済み</span>';
+    const provisionalBlock=p.provisional?`<div class="provisional-note"><b>調査前の暫定レコード</b><span>寸法・性質・地域適合は未検証です。${p.riskFlags?.length?` 注意項目 ${p.riskFlags.length}件。`:''}</span></div>`:'';
     const sourceBlock=p.sources?.length?`<details class="source-detail"><summary>調査出典 ${p.sources.length}件</summary>${p.sources.map(source=>`<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a>`).join('')}</details>`:'';
     return `<article class="plant-card grade-${grade} ${state.selected[p.id]?'selected':''} ${grade==='reject'?'dimmed':''}">
-      <div class="card-status"><div><span class="grade-badge ${grade}">${gradeName}</span>${p.origin==='custom'?'<span class="local-badge">端末DB</span>':''}</div><span>役割一致 ${p.matched}件</span></div>
+      <div class="card-status"><div><span class="grade-badge ${grade}">${gradeName}</span>${databaseBadge}</div><span>役割一致 ${p.matched}件</span></div>
       <div class="plant-card-body">
         <div class="plant-visual"><div class="leaf-icon" style="--leaf-bg:${escapeHtml(p.tone)}">${escapeHtml(p.icon)}</div><span>${escapeHtml(p.colors.join('・'))}</span></div>
         <div class="plant-main">
@@ -253,7 +265,7 @@ function renderPlants(){
           </div>
           <div class="botanical-detail"><span class="color-swatch" style="--swatch:${escapeHtml(p.tone)}"></span><b>葉形</b>${escapeHtml(p.form)}</div>
           <div class="role-match"><b>一致</b>${escapeHtml(matchedRoles.length?matchedRoles.join('・'):'指定した役割との一致なし')}</div>
-          <p class="reason"><b>${p.issues.length?'確認点':'選定理由'}</b>${escapeHtml(judgement)}</p>${sourceBlock}
+          <p class="reason"><b>${p.issues.length?'確認点':'選定理由'}</b>${escapeHtml(judgement)}</p>${provisionalBlock}${sourceBlock}
         </div>
         <div class="score-panel ${grade}" style="--score:${p.score}">
           <div class="score-ring"><span><strong>${p.score}</strong><small>/100</small></span></div>
@@ -326,7 +338,10 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{if(e.target.matches('[data-count]')){state.selected[e.target.dataset.count]=Math.max(1,Number(e.target.value));renderSelection();}if(['width','depth'].includes(e.target.id))renderSelection();});
 el('maxHeight').addEventListener('input',e=>{state.maxHeight=Number(e.target.value);el('heightOutput').textContent=`${state.maxHeight}cm`;renderPlants();});
-el('plantSearch').addEventListener('input',renderPlants);el('sortMode').addEventListener('change',renderPlants);
+el('plantSearch').addEventListener('input',()=>{state.visibleLimit=60;renderPlants();});
+el('databaseFilter').addEventListener('change',()=>{state.visibleLimit=60;renderPlants();});
+el('sortMode').addEventListener('change',()=>{state.visibleLimit=60;renderPlants();});
+el('loadMore').onclick=()=>{state.visibleLimit+=60;renderPlants();};
 el('photoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await storePhoto(f);showPhoto(f);toast('写真をこのiPad内に保存しました');}catch{toast('写真を保存できませんでした');}});
 el('clearRoles').onclick=()=>{state.roles.clear();renderRoles();renderPlants();};
 el('clearSelection').onclick=()=>{state.selected={};renderPlants();renderSelection();};
@@ -349,5 +364,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.3.2').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.4.0').then(reg=>reg.update()).catch(()=>{});
 }

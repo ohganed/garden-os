@@ -73,7 +73,7 @@ input[type="range"] { width:100%; accent-color:var(--green); }
 .sticky-heading { position:sticky; top:-18px; z-index:4; background:#1c2821; padding:18px 0 10px; }
 .research-entry { width:100%;display:flex;justify-content:space-between;align-items:center;margin:0 0 13px;padding:11px 13px;text-align:left;border-color:#63806c;background:linear-gradient(135deg,#263c2e,#1d3025);color:#d9ebdd;box-shadow:inset 0 0 0 1px rgba(159,207,114,.08); }
 .research-entry span { display:grid;gap:3px; }.research-entry b { font-size:12px; }.research-entry small { color:#91aa99;font-size:9px;font-weight:400; }.research-entry i { color:var(--green);font-size:24px;font-style:normal; }
-.search-row { display:grid; grid-template-columns:1fr 115px; gap:8px; margin-bottom:10px; }
+.search-row { display:grid; grid-template-columns:minmax(160px,1fr) 105px 115px; gap:8px; margin-bottom:10px; }
 .legend { display:flex; gap:7px; color:var(--muted); font-size:10px; margin-bottom:12px; }
 .legend span { display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:999px;background:#121a15; }
 .legend i { width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(159,207,114,.1); }
@@ -89,7 +89,14 @@ input[type="range"] { width:100%; accent-color:var(--green); }
 .grade-badge.fit { color:#dff6d0;background:rgba(108,160,91,.26); }
 .grade-badge.caution { color:#ffe2a9;background:rgba(185,137,60,.25); }
 .grade-badge.reject { color:#ffe0e0;background:#743f43;box-shadow:0 0 0 1px rgba(255,178,178,.18); }
-.local-badge { display:inline-flex;margin-left:5px;padding:4px 7px;border-radius:999px;background:#27384a;color:#bad7ef;font-size:8px;font-weight:750;letter-spacing:.06em; }
+.local-badge,.candidate-badge,.core-badge { display:inline-flex;margin-left:5px;padding:4px 7px;border-radius:999px;font-size:8px;font-weight:750;letter-spacing:.06em; }
+.local-badge { background:#27384a;color:#bad7ef; }
+.candidate-badge { background:#4b3d25;color:#f1d49c; }
+.core-badge { background:#27382f;color:#bfe2c6; }
+.candidate-key { margin-left:auto;color:#daba7d; }
+.provisional-note { margin-top:8px;padding:8px 9px;border:1px dashed rgba(218,186,125,.42);border-radius:8px;background:rgba(121,91,42,.1);color:#d9c7a4;display:grid;gap:2px;font-size:9px;line-height:1.45; }
+.provisional-note b { color:#efd8a8;font-size:9px; }
+.load-more { width:100%;margin-top:10px; }
 .plant-card-body { display:grid;grid-template-columns:62px minmax(0,1fr) 72px;gap:13px;align-items:start;padding:12px; }
 .plant-visual { display:grid;justify-items:center;gap:6px; }
 .plant-visual>span { color:#aebbb2;font-size:9px;line-height:1.25;text-align:center; }

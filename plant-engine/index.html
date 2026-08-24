@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Plant Engine" />
     <title>Plant Engine</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.3.2" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.4.0" />
     <link rel="apple-touch-icon" href="icons/icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=0.3.2" />
+    <link rel="stylesheet" href="styles.css?v=0.4.0" />
   </head>
   <body>
     <header class="topbar">
@@ -87,11 +87,13 @@
         </div>
         <div class="search-row">
           <input id="plantSearch" type="search" placeholder="名前・葉色・役割で検索" />
+          <select id="databaseFilter" aria-label="データ区分"><option value="all">全DB</option><option value="core">確認済み</option><option value="candidate">候補DB</option><option value="custom">端末DB</option></select>
           <select id="sortMode" aria-label="並び順"><option value="score">適合度順</option><option value="height">高さ順</option><option value="name">名前順</option></select>
         </div>
-        <div class="legend"><span><i class="fit"></i>適合</span><span><i class="caution"></i>要確認</span><span><i class="reject"></i>条件外</span></div>
+        <div class="legend"><span><i class="fit"></i>適合</span><span><i class="caution"></i>要確認</span><span><i class="reject"></i>条件外</span><span class="candidate-key">候補DB＝暫定値</span></div>
         <button type="button" class="research-entry" id="openResearch"><span><b>＋ 未知植物を調査・登録</b><small>Webで調べた植物を、このiPadの植物DBへ追加</small></span><i>›</i></button>
         <div id="plantList" class="plant-list"></div>
+        <button type="button" class="ghost load-more" id="loadMore" hidden>さらに表示</button>
       </section>
 
       <section class="panel plan-panel" aria-labelledby="planHeading">
@@ -158,6 +160,7 @@
       </div>
     </dialog>
 
-    <script src="app.js?v=0.3.2"></script>
+    <script src="plant-candidates.js?v=0.4.0"></script>
+    <script src="app.js?v=0.4.0"></script>
   </body>
 </html>
