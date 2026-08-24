@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Plant Engine" />
     <title>Plant Engine</title>
-    <link rel="manifest" href="manifest.webmanifest?v=0.5.0" />
+    <link rel="manifest" href="manifest.webmanifest?v=0.6.0" />
     <link rel="apple-touch-icon" href="icons/icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=0.5.0" />
+    <link rel="stylesheet" href="styles.css?v=0.6.0" />
   </head>
   <body>
     <header class="topbar">
@@ -38,17 +38,21 @@
           <span class="status-dot">入力中</span>
         </div>
 
-        <label class="photo-drop" for="photoInput">
+        <div class="photo-drop" id="photoStage">
           <input id="photoInput" type="file" accept="image/*" capture="environment" />
           <img id="photoPreview" alt="現地写真" hidden />
-          <span id="photoPrompt"><b>現地写真を追加</b><small>撮影またはフォトライブラリから選択</small></span>
-        </label>
+          <div id="photoMarkerLayer" class="photo-marker-layer" aria-label="既存植物の位置"></div>
+          <label id="photoPrompt" for="photoInput"><b>現地写真を追加</b><small>撮影またはフォトライブラリから選択</small></label>
+          <label id="photoReplace" class="photo-replace" for="photoInput" hidden>写真を変更</label>
+          <span id="placementHint" class="placement-hint" hidden>写真上の位置をタップ</span>
+        </div>
 
         <div class="field-grid">
           <label><span>地域</span><input id="region" value="栃木県小山市" /></label>
           <label><span>場所</span><input id="location" value="建物沿いの植栽帯" /></label>
           <label><span>横幅</span><div class="unit-input"><input id="width" type="number" value="1.5" step="0.1" /><i>m</i></div></label>
           <label><span>奥行</span><div class="unit-input"><input id="depth" type="number" value="0.4" step="0.1" /><i>m</i></div></label>
+          <label><span>植え付け予定日</span><input id="plantingDate" type="date" /></label>
         </div>
 
         <fieldset>
@@ -75,8 +79,9 @@
         </div>
 
         <div class="subsection">
-          <h2>既存植物</h2>
+          <div class="subheading"><div><h2>既存植物</h2><small>「位置指定」後、写真上をタップ</small></div></div>
           <div class="existing-list" id="existingList"></div>
+          <div class="existing-add"><input id="existingName" placeholder="既存植物名" /><input id="existingDetail" placeholder="例：2株・残す" /><button type="button" id="addExisting">追加</button></div>
         </div>
       </section>
 
@@ -123,6 +128,11 @@
         <section class="case-visuals" aria-labelledby="visualsHeading">
           <div class="subheading"><div><h2 id="visualsHeading">案件イメージ</h2><small>AIで得た外観案を、この端末の案件へ保存</small></div><button type="button" class="text-button" id="openVisualPlanner">作成する</button></div>
           <div id="conceptBoard" class="concept-board"></div>
+        </section>
+
+        <section class="case-visuals growth-visuals" aria-labelledby="growthHeading">
+          <div class="subheading"><div><h2 id="growthHeading">成長タイムライン</h2><small>1・2・3・6か月後と1年後</small></div><button type="button" class="text-button" id="openGrowthPlanner">作成する</button></div>
+          <div id="growthBoard" class="concept-board growth-board"></div>
         </section>
 
         <div class="plan-actions">
@@ -184,11 +194,22 @@
             <span class="step-number">3</span>
             <div><h3>得られた画像を案件へ貼り付け</h3><p>画像を長押しで保存した後、下の5枠へ入れます。画像はGitHubへ送られず、この端末内だけに保存されます。</p><div id="visualUploadGrid" class="visual-upload-grid"></div></div>
           </section>
+          <section class="timeline-divider">
+            <span class="eyebrow">GROWTH TIMELINE</span><h3>同じ配置の時間変化を作る</h3><p>採用した配置を固定し、季節・休眠・活着を考慮した5時点を比較します。これは確定予報ではなく、管理計画のための推定イメージです。</p>
+          </section>
+          <section class="visual-step prompt-step">
+            <span class="step-number">4</span>
+            <div><div class="growth-controls"><label for="growthBasePlan">基準にする配置案</label><select id="growthBasePlan"><option value="A">A｜自然群生</option><option value="B">B｜リズム配置</option><option value="C">C｜立体レイヤー</option><option value="D">D｜焦点と余白</option><option value="E">E｜密度のある景観</option></select></div><div class="research-label-row"><label for="growthPrompt">5時点の成長予測プロンプト</label><button type="button" class="mini-button" id="buildGrowthPrompt">再生成</button></div><textarea id="growthPrompt" readonly></textarea><button type="button" class="primary visual-copy" id="copyGrowthPrompt">プロンプトをコピー</button></div>
+          </section>
+          <section class="visual-step">
+            <span class="step-number">5</span>
+            <div><h3>成長予測画像を案件へ保存</h3><p>AIへ現地写真と、基準にする配置案の画像を添付してください。得られた5時点を下へ保存します。</p><div id="growthUploadGrid" class="visual-upload-grid"></div></div>
+          </section>
         </div>
       </div>
     </dialog>
 
-    <script src="plant-candidates.js?v=0.5.0"></script>
-    <script src="app.js?v=0.5.0"></script>
+    <script src="plant-candidates.js?v=0.6.0"></script>
+    <script src="app.js?v=0.6.0"></script>
   </body>
 </html>

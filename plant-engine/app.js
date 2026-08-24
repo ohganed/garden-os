@@ -33,8 +33,8 @@ const state = {
   roles:new Set(['winter','dark','blue','wine','camel','vertical','broad','small','texture']),
   selected:{},
   existing:[
-    {id:'halcyon',name:'ギボウシ ‘Halcyon’',detail:'1株'},
-    {id:'ferns',name:'既存のシダ',detail:'半分残す'}
+    {id:'halcyon',name:'ギボウシ ‘Halcyon’',detail:'1株',position:null},
+    {id:'ferns',name:'既存のシダ',detail:'半分残す',position:null}
   ]
 };
 
@@ -50,7 +50,10 @@ const conceptPatterns=[
   ['D','焦点と余白','主役となる植物群を一か所に置き、周囲に落ち着いた余白を残す'],
   ['E','密度のある景観','成長後の混み合いを避けつつ、植え付け直後から群生感が出るよう配置する']
 ];
+const growthStages=[['1M','1か月後'],['2M','2か月後'],['3M','3か月後'],['6M','6か月後'],['1Y','1年後']];
 let conceptImages=Array(5).fill(null);
+let growthImages=Array(5).fill(null);
+let activeExistingPlacement=null;
 
 function loadCustomPlants(){
   try{
@@ -133,16 +136,36 @@ function renderExisting(){
   const container=el('existingList');
   if(!state.existing.length){
     container.innerHTML='<div class="existing-empty">既存植物なし</div>';
+    renderPhotoMarkers();
     return;
   }
-  container.innerHTML=state.existing.map(item=>`<div class="existing-item"><span>${item.name}</span><b>${item.detail}</b><button type="button" data-existing-remove="${item.id}" aria-label="${item.name}を削除">×</button></div>`).join('');
+  container.innerHTML=state.existing.map(item=>`<div class="existing-item ${activeExistingPlacement===item.id?'placing':''}"><span>${escapeHtml(item.name)}<small>${item.position?`写真位置 ${Math.round(item.position.x)}%, ${Math.round(item.position.y)}%`:'位置未指定'}</small></span><b>${escapeHtml(item.detail)}</b><button type="button" class="position-button" data-existing-position="${escapeHtml(item.id)}">${item.position?'再指定':'位置指定'}</button><button type="button" data-existing-remove="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.name)}を削除">×</button></div>`).join('');
+  container.querySelectorAll('[data-existing-position]').forEach(button=>button.onclick=()=>startExistingPlacement(button.dataset.existingPosition));
   container.querySelectorAll('[data-existing-remove]').forEach(button=>{
     button.onclick=()=>{
       state.existing=state.existing.filter(item=>item.id!==button.dataset.existingRemove);
+      if(activeExistingPlacement===button.dataset.existingRemove)cancelExistingPlacement();
       renderExisting();
       toast('既存植物から削除しました');
     };
   });
+  renderPhotoMarkers();
+}
+
+function addExistingPlant(){
+  const name=el('existingName').value.trim(),detail=el('existingDetail').value.trim()||'残す';
+  if(!name){toast('既存植物名を入力してください');return;}
+  const item={id:`existing-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,name,detail,position:null};
+  state.existing.push(item);el('existingName').value='';el('existingDetail').value='';renderExisting();startExistingPlacement(item.id);
+}
+function startExistingPlacement(id){
+  if(el('photoPreview').hidden){toast('先に現地写真を追加してください');return;}
+  activeExistingPlacement=id;el('photoStage').classList.add('placing');el('placementHint').hidden=false;renderExisting();toast('写真上で植物の中心位置をタップしてください');
+}
+function cancelExistingPlacement(){activeExistingPlacement=null;el('photoStage').classList.remove('placing');el('placementHint').hidden=true;}
+function renderPhotoMarkers(){
+  const layer=el('photoMarkerLayer');
+  layer.innerHTML=state.existing.filter(item=>item.position).map((item,index)=>`<button type="button" class="photo-marker" style="left:${item.position.x}%;top:${item.position.y}%" data-marker-id="${escapeHtml(item.id)}" title="${escapeHtml(item.name)}"><b>${index+1}</b><span>${escapeHtml(item.name)}</span></button>`).join('');
 }
 
 function buildResearchPrompt(){
@@ -318,15 +341,15 @@ function diagnose(entries,percent){
 
 function summary(){
   const selected=Object.entries(state.selected).map(([id,n])=>{const plant=plants.find(p=>p.id===id);return plant?`${plant.name}×${n}`:'';}).filter(Boolean).join('、')||'未選択';
-  const existing=state.existing.map(item=>`${item.name} ${item.detail}`).join('、')||'なし';
-  return `【${el('caseName').value}】\n地域：${el('region').value}\n場所：${el('location').value}\n寸法：${el('width').value}m × ${el('depth').value}m\n日照：${document.querySelector('[data-field="sun"] .active').textContent}\n土：${document.querySelector('[data-field="moisture"] .active').textContent}\n高さ上限：${state.maxHeight}cm\n既存：${existing}\n採用候補：${selected}`;
+  const existing=state.existing.map(item=>`${item.name} ${item.detail}${item.position?`（写真位置 ${Math.round(item.position.x)}%,${Math.round(item.position.y)}%）`:''}`).join('、')||'なし';
+  return `【${el('caseName').value}】\n地域：${el('region').value}\n場所：${el('location').value}\n寸法：${el('width').value}m × ${el('depth').value}m\n植え付け予定日：${el('plantingDate').value}\n日照：${document.querySelector('[data-field="sun"] .active').textContent}\n土：${document.querySelector('[data-field="moisture"] .active').textContent}\n高さ上限：${state.maxHeight}cm\n既存：${existing}\n採用候補：${selected}`;
 }
 
 function buildVisualPrompt(){
   const entries=Object.entries(state.selected).map(([id,count])=>{const plant=plants.find(p=>p.id===id);return plant?{...plant,count}:null;}).filter(Boolean);
   if(!entries.length){toast('先に採用する植物を選んでください');return '';}
   const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／草丈約${p.height}cm・株張り約${p.spread}cm・${p.form}${p.provisional?'［寸法等は暫定値］':''}`).join('\n');
-  const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}`).join('\n'):'- 既存植物なし';
+  const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}／${x.position?`写真左端から${Math.round(x.position.x)}%、上端から${Math.round(x.position.y)}%の位置を固定`:'写真で見える現在位置を固定（座標未指定）'}`).join('\n'):'- 既存植物なし';
   const patterns=conceptPatterns.map(([key,title,description])=>`${key}. ${title}：${description}`).join('\n');
   const prompt=`添付した現地写真を基準に、次の採用植物だけを使った庭の完成外観イメージを、A〜Eの5枚の独立した画像として作成してください。
 
@@ -335,6 +358,7 @@ function buildVisualPrompt(){
 - 地域：${el('region').value}
 - 場所：${el('location').value}
 - 植栽範囲：横${el('width').value}m × 奥行${el('depth').value}m
+- 植え付け予定日：${el('plantingDate').value}
 - 日照：${document.querySelector('[data-field="sun"] .active').textContent}
 - 雨の翌日の土：${document.querySelector('[data-field="moisture"] .active').textContent}
 - 高さ上限：${state.maxHeight}cm
@@ -350,7 +374,7 @@ ${patterns}
 
 【必須条件】
 1. 5案すべてで植物の種類と株数を変えず、配置構成だけを変える。色違いや撮影角度だけを別案として数えない。
-2. 採用リストにない植物を追加しない。既存植物は写真内の位置関係を尊重して残す。
+2. 採用リストにない植物を追加しない。既存植物は指定座標を固定点として、移植・削除・複製・種類変更を一切せず、その間の空地へ採用植物を配置する。
 3. 添付写真の建物、壁、窓、通路、縁石、地面の形、遠景、光の方向を維持する。
 4. 指定された横幅・奥行・高さ上限を守り、植物を実寸に近い比率で描く。
 5. 葉の形、葉色、株立ち、広がり方を植物ごとに区別し、同じような葉へ均一化しない。
@@ -365,8 +389,52 @@ ${patterns}
 
 function openVisualPlanner(){
   if(!Object.keys(state.selected).length){toast('先に採用する植物を選んでください');return;}
-  buildVisualPrompt();renderVisualUploadGrid();
+  buildVisualPrompt();buildGrowthPrompt();renderVisualUploadGrid();renderGrowthUploadGrid();
   const dialog=el('visualDialog');typeof dialog.showModal==='function'?dialog.showModal():dialog.setAttribute('open','');
+}
+
+function dateAfterMonths(months){const fallback=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date()),value=el('plantingDate').value||fallback;el('plantingDate').value=value;const base=new Date(`${value}T12:00:00`),target=new Date(base.getFullYear(),base.getMonth()+months,1,12);target.setDate(Math.min(base.getDate(),new Date(target.getFullYear(),target.getMonth()+1,0).getDate()));return target;}
+function stageDate(months){const date=dateAfterMonths(months);return `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;}
+function seasonForMonth(month){return month<=2||month===12?'冬':month<=5?'春':month<=8?'夏':'秋';}
+function buildGrowthPrompt(){
+  const entries=Object.entries(state.selected).map(([id,count])=>{const plant=plants.find(p=>p.id===id);return plant?{...plant,count}:null;}).filter(Boolean);
+  if(!entries.length){toast('先に採用する植物を選んでください');return '';}
+  const selected=entries.map((p,index)=>`${index+1}. ${p.name}（${p.latin}）×${p.count}株／成熟草丈約${p.height}cm・成熟株張り約${p.spread}cm／冬姿:${winterLabel[p.winter]}／広がり:${spreadLabel[p.spreadType]}${p.provisional?'［基礎データは暫定・要検証］':''}`).join('\n');
+  const existing=state.existing.length?state.existing.map(x=>`- ${x.name}：${x.detail}／${x.position?`写真左端から${Math.round(x.position.x)}%、上端から${Math.round(x.position.y)}%`:'写真内の現在位置'}`).join('\n'):'- 既存植物なし';
+  const baseKey=el('growthBasePlan').value||'A',base=conceptPatterns.find(x=>x[0]===baseKey)||conceptPatterns[0];
+  const stages=[1,2,3,6,12].map((months,index)=>{const date=dateAfterMonths(months);return `${growthStages[index][1]}（${stageDate(months)}・${seasonForMonth(date.getMonth()+1)}）`;}).join('\n');
+  const prompt=`添付する2枚の画像、①現在の現地写真、②採用済みの配置案${base[0]}「${base[1]}」を基準に、同じ庭・同じ配置の時間変化を5枚の独立画像で予測してください。
+
+【植栽条件】
+- 地域：${el('region').value}
+- 場所：${el('location').value}
+- 植栽範囲：横${el('width').value}m × 奥行${el('depth').value}m
+- 植え付け日：${el('plantingDate').value}
+- 日照：${document.querySelector('[data-field="sun"] .active').textContent}
+- 雨の翌日の土：${document.querySelector('[data-field="moisture"] .active').textContent}
+- 高さ上限：${state.maxHeight}cm
+
+【固定する既存植物】
+${existing}
+
+【新たに植える植物】
+${selected}
+
+【出力する5時点】
+${stages}
+
+【成長推定の規則】
+1. 5枚すべてでカメラ位置、画角、建物、縁石、地形、既存植物の座標、新規植物の植え付け位置と株数を完全に固定する。
+2. 時間経過で変えてよいのは、各植物の活着、草丈、株幅、葉数、花、季節色、落葉・休眠だけとする。植物を追加・消去・移動しない。
+3. 1か月後は活着途中として急激に巨大化させない。2〜3か月後は季節と生育速度に応じた変化、6か月後は季節が変わる場合の落葉・休眠・地上部消失も正直に描く。1年後は同じ季節に戻った定着株であり、成熟株の最大サイズにはしない。
+4. 常緑・半常緑・落葉性、開花期、暑さ寒さ、関東の梅雨と夏、冬の休眠を植物ごとに区別する。季節外れの花や一年中同じ姿を描かない。
+5. 地下茎・ランナー型は緩やかな被覆拡大、株立ちは株の中心を保った肥大として表現する。隣株との競合と空隙も現実的に示す。
+6. 暫定データの植物は断定的に誇張せず、一般的な成長幅の中間値で描く。不確実な点は画像外の説明で示す。
+7. 写実的な定点観測写真。人、文字、ラベル、鉢、家具、装飾品を加えない。画像内に月数を書かない。
+8. 各画像の外側に、対象日、季節、各植物の推定草丈・株幅、開花または休眠状態、混雑・剪定・株分けの注意を短く添える。
+
+最初に5時点の変化を表で整理し、その後、同一構図の5枚を時系列順に生成してください。これは生育保証ではなく、管理判断用の推定シナリオとして扱ってください。`;
+  el('growthPrompt').value=prompt;return prompt;
 }
 
 function compressConceptImage(file){
@@ -391,6 +459,13 @@ function conceptCard(slot,mode){
 }
 function renderVisualUploadGrid(){const container=el('visualUploadGrid');releaseConceptUrls(container);container.innerHTML=conceptPatterns.map((_,i)=>conceptCard(i,'upload')).join('');}
 function renderConceptBoard(){const container=el('conceptBoard');releaseConceptUrls(container);container.innerHTML=conceptPatterns.map((_,i)=>conceptCard(i,'board')).join('');}
+function growthCard(slot,mode){
+  const [key,title]=growthStages[slot],blob=growthImages[slot],url=conceptImageUrl(blob);
+  if(mode==='upload')return `<div class="visual-upload-slot ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${title}">`:'<span class="upload-plus">＋</span>'}<b>${key}｜${title}</b><label><input type="file" accept="image/*" data-growth-upload="${slot}">${blob?'画像を変更':'画像を選ぶ'}</label>${blob?`<button type="button" data-growth-delete="${slot}">削除</button>`:''}</div>`;
+  return `<article class="concept-card ${blob?'has-image':''}">${blob?`<img src="${url}" data-object-url="${url}" alt="${title}">`:`<div class="concept-placeholder">${key}</div>`}<div><b>${title}</b><small>${blob?'端末内に保存済み':'まだ画像がありません'}</small></div></article>`;
+}
+function renderGrowthUploadGrid(){const container=el('growthUploadGrid');releaseConceptUrls(container);container.innerHTML=growthStages.map((_,i)=>growthCard(i,'upload')).join('');}
+function renderGrowthBoard(){const container=el('growthBoard');releaseConceptUrls(container);container.innerHTML=growthStages.map((_,i)=>growthCard(i,'board')).join('');}
 
 function toast(msg){const t=el('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),1800);}
 function openPhotoDb(){
@@ -407,39 +482,51 @@ async function deletePhoto(){const db=await openPhotoDb();return new Promise((re
 async function storeConceptImage(slot,blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').put(blob,`current-case-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 async function loadConceptImages(){const db=await openPhotoDb();return Promise.all(conceptPatterns.map((_,slot)=>new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readonly');const req=tx.objectStore('concept-images').get(`current-case-${slot}`);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);}))).finally(()=>db.close());}
 async function deleteConceptImage(slot){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').delete(`current-case-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function storeGrowthImage(slot,blob){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').put(blob,`current-case-growth-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
+async function loadGrowthImages(){const db=await openPhotoDb();return Promise.all(growthStages.map((_,slot)=>new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readonly');const req=tx.objectStore('concept-images').get(`current-case-growth-${slot}`);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);}))).finally(()=>db.close());}
+async function deleteGrowthImage(slot){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').delete(`current-case-growth-${slot}`);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
 async function deleteAllConceptImages(){const db=await openPhotoDb();return new Promise((resolve,reject)=>{const tx=db.transaction('concept-images','readwrite');tx.objectStore('concept-images').clear();tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);});}
-function showPhoto(blob){if(!blob)return;const old=el('photoPreview').dataset.objectUrl;if(old)URL.revokeObjectURL(old);const url=URL.createObjectURL(blob);el('photoPreview').dataset.objectUrl=url;el('photoPreview').src=url;el('photoPreview').hidden=false;el('photoPrompt').hidden=true;}
+function showPhoto(blob){if(!blob)return;const old=el('photoPreview').dataset.objectUrl;if(old)URL.revokeObjectURL(old);const url=URL.createObjectURL(blob);el('photoPreview').dataset.objectUrl=url;el('photoPreview').src=url;el('photoPreview').hidden=false;el('photoPrompt').hidden=true;el('photoReplace').hidden=false;renderPhotoMarkers();}
 
-function save(){const data={caseName:el('caseName').value,region:el('region').value,location:el('location').value,width:el('width').value,depth:el('depth').value,sun:state.sun,moisture:state.moisture,maxHeight:state.maxHeight,selected:state.selected,roles:[...state.roles],existing:state.existing};localStorage.setItem('plant-engine-case',JSON.stringify(data));toast('相談案件をiPad内に保存しました');}
-async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[])});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const [photo,concepts]=await Promise.all([loadPhoto(),loadConceptImages()]);if(photo)showPhoto(photo);conceptImages=concepts;renderConceptBoard();}catch{renderConceptBoard();}}
+function save(){const data={caseName:el('caseName').value,region:el('region').value,location:el('location').value,width:el('width').value,depth:el('depth').value,plantingDate:el('plantingDate').value,sun:state.sun,moisture:state.moisture,maxHeight:state.maxHeight,selected:state.selected,roles:[...state.roles],existing:state.existing};localStorage.setItem('plant-engine-case',JSON.stringify(data));toast('相談案件をiPad内に保存しました');}
+async function restore(){try{const d=JSON.parse(localStorage.getItem('plant-engine-case'));if(d){['caseName','region','location','width','depth','plantingDate'].forEach(k=>{if(d[k]!=null)el(k).value=d[k]});Object.assign(state,d,{roles:new Set(d.roles||[]),existing:(d.existing||[]).map(x=>({...x,position:x.position||null}))});document.querySelectorAll('.segmented').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.value===state[g.dataset.field])));el('maxHeight').value=state.maxHeight;el('heightOutput').textContent=`${state.maxHeight}cm`;}const [photo,concepts,growth]=await Promise.all([loadPhoto(),loadConceptImages(),loadGrowthImages()]);if(photo)showPhoto(photo);conceptImages=concepts;growthImages=growth;renderConceptBoard();renderGrowthBoard();}catch{renderConceptBoard();renderGrowthBoard();}}
 
 document.addEventListener('click',e=>{
   const seg=e.target.closest('.segmented button');if(seg){const g=seg.parentElement;g.querySelectorAll('button').forEach(b=>b.classList.remove('active'));seg.classList.add('active');state[g.dataset.field]=seg.dataset.value;renderPlants();return;}
   const select=e.target.closest('[data-select]');if(select){const id=select.dataset.select;state.selected[id]?delete state.selected[id]:state.selected[id]=1;renderPlants();renderSelection();return;}
   const remove=e.target.closest('[data-remove]');if(remove){delete state.selected[remove.dataset.remove];renderPlants();renderSelection();}
   const conceptDelete=e.target.closest('[data-concept-delete]');if(conceptDelete){const slot=Number(conceptDelete.dataset.conceptDelete);deleteConceptImage(slot).then(()=>{conceptImages[slot]=null;renderVisualUploadGrid();renderConceptBoard();toast(`${conceptPatterns[slot][0]}案の画像を削除しました`);}).catch(()=>toast('画像を削除できませんでした'));}
+  const growthDelete=e.target.closest('[data-growth-delete]');if(growthDelete){const slot=Number(growthDelete.dataset.growthDelete);deleteGrowthImage(slot).then(()=>{growthImages[slot]=null;renderGrowthUploadGrid();renderGrowthBoard();toast(`${growthStages[slot][1]}の画像を削除しました`);}).catch(()=>toast('画像を削除できませんでした'));}
+  const marker=e.target.closest('[data-marker-id]');if(marker&&!activeExistingPlacement){startExistingPlacement(marker.dataset.markerId);}
 });
 document.addEventListener('change',async e=>{
   if(e.target.matches('[data-count]')){state.selected[e.target.dataset.count]=Math.max(1,Number(e.target.value));renderSelection();}
   if(['width','depth'].includes(e.target.id))renderSelection();
   if(e.target.matches('[data-concept-upload]')){const file=e.target.files?.[0];if(!file)return;const slot=Number(e.target.dataset.conceptUpload);try{const blob=await compressConceptImage(file);await storeConceptImage(slot,blob);conceptImages[slot]=blob;renderVisualUploadGrid();renderConceptBoard();toast(`${conceptPatterns[slot][0]}案を案件へ保存しました`);}catch{toast('画像を保存できませんでした');}}
+  if(e.target.matches('[data-growth-upload]')){const file=e.target.files?.[0];if(!file)return;const slot=Number(e.target.dataset.growthUpload);try{const blob=await compressConceptImage(file);await storeGrowthImage(slot,blob);growthImages[slot]=blob;renderGrowthUploadGrid();renderGrowthBoard();toast(`${growthStages[slot][1]}を案件へ保存しました`);}catch{toast('画像を保存できませんでした');}}
 });
 el('maxHeight').addEventListener('input',e=>{state.maxHeight=Number(e.target.value);el('heightOutput').textContent=`${state.maxHeight}cm`;renderPlants();});
 el('plantSearch').addEventListener('input',()=>{state.visibleLimit=60;renderPlants();});
 el('databaseFilter').addEventListener('change',()=>{state.visibleLimit=60;renderPlants();});
 el('sortMode').addEventListener('change',()=>{state.visibleLimit=60;renderPlants();});
 el('loadMore').onclick=()=>{state.visibleLimit+=60;renderPlants();};
-el('photoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await storePhoto(f);showPhoto(f);toast('写真をこのiPad内に保存しました');}catch{toast('写真を保存できませんでした');}});
+el('photoInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await storePhoto(f);showPhoto(f);cancelExistingPlacement();toast('写真をこのiPad内に保存しました');}catch{toast('写真を保存できませんでした');}});
+el('photoStage').addEventListener('click',event=>{if(!activeExistingPlacement||event.target.closest('label'))return;const image=el('photoPreview'),rect=image.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return;const item=state.existing.find(x=>x.id===activeExistingPlacement);if(!item)return;item.position={x:Math.max(0,Math.min(100,(event.clientX-rect.left)/rect.width*100)),y:Math.max(0,Math.min(100,(event.clientY-rect.top)/rect.height*100))};const name=item.name;cancelExistingPlacement();renderExisting();toast(`${name}の位置を記録しました`);});
+el('addExisting').onclick=addExistingPlant;
 el('clearRoles').onclick=()=>{state.roles.clear();renderRoles();renderPlants();};
 el('clearSelection').onclick=()=>{state.selected={};renderPlants();renderSelection();};
 el('saveCase').onclick=save;
-el('newCase').onclick=async()=>{if(confirm('現在の入力・現地写真・外観イメージを消して新しい案件を始めますか？')){localStorage.removeItem('plant-engine-case');await Promise.all([deletePhoto(),deleteAllConceptImages()]);location.reload();}};
+el('newCase').onclick=async()=>{if(confirm('現在の入力・現地写真・外観案・成長予測を消して新しい案件を始めますか？')){localStorage.removeItem('plant-engine-case');await Promise.all([deletePhoto(),deleteAllConceptImages()]);location.reload();}};
 el('copySummary').onclick=async()=>{await navigator.clipboard.writeText(summary());toast('相談メモをコピーしました');};
 el('makePlan').onclick=()=>{if(!Object.keys(state.selected).length){toast('採用する植物を選んでください');return;}save();toast('採用案を確定しました');openVisualPlanner();};
 el('openVisualPlanner').onclick=openVisualPlanner;
+el('openGrowthPlanner').onclick=()=>{openVisualPlanner();setTimeout(()=>el('growthPrompt').scrollIntoView({behavior:'smooth',block:'start'}),120);};
 el('closeVisualPlanner').onclick=()=>{const dialog=el('visualDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
 el('buildVisualPrompt').onclick=buildVisualPrompt;
 el('copyVisualPrompt').onclick=async()=>{const prompt=el('visualPrompt').value||buildVisualPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('5案生成用プロンプトをコピーしました');}catch{el('visualPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
+el('buildGrowthPrompt').onclick=buildGrowthPrompt;
+el('growthBasePlan').addEventListener('change',buildGrowthPrompt);
+el('copyGrowthPrompt').onclick=async()=>{const prompt=el('growthPrompt').value||buildGrowthPrompt();if(!prompt)return;try{await navigator.clipboard.writeText(prompt);toast('成長予測プロンプトをコピーしました');}catch{el('growthPrompt').select();toast('プロンプトを選択しました。コピーしてください');}};
 el('openResearch').onclick=()=>{renderCustomPlantList();const dialog=el('researchDialog');typeof dialog.showModal==='function'?dialog.showModal():dialog.setAttribute('open','');};
 el('closeResearch').onclick=()=>{const dialog=el('researchDialog');typeof dialog.close==='function'?dialog.close():dialog.removeAttribute('open');};
 el('buildPrompt').onclick=buildResearchPrompt;
@@ -448,7 +535,8 @@ el('registerPlant').onclick=registerResearchPlant;
 el('researchDialog').addEventListener('click',event=>{if(event.target===el('researchDialog'))el('closeResearch').click();});
 el('visualDialog').addEventListener('click',event=>{if(event.target===el('visualDialog'))el('closeVisualPlanner').click();});
 
-renderConceptBoard();restore();renderRoles();renderExisting();renderCustomPlantList();renderPlants();renderSelection();
+el('plantingDate').value=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
+renderConceptBoard();renderGrowthBoard();restore();renderRoles();renderExisting();renderCustomPlantList();renderPlants();renderSelection();
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
@@ -456,5 +544,5 @@ if('serviceWorker' in navigator){
     refreshing=true;
     location.reload();
   });
-  navigator.serviceWorker.register('./sw.js?v=0.5.0').then(reg=>reg.update()).catch(()=>{});
+  navigator.serviceWorker.register('./sw.js?v=0.6.0').then(reg=>reg.update()).catch(()=>{});
 }
