@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "recordId": "store-observation-2026-10-09",
+  "observedAt": "2026-10-09",
+  "status": "candidate_not_purchased",
+  "location": "garden center (unspecified)",
+  "intendedSite": {
+    "type": "existing flower bed",
+    "sunlight": "morning sun until around noon"
+  },
+  "photos": [
+    {
+      "index": 1,
+      "description": "lace lavender shelf"
+    },
+    {
+      "index": 2,
+      "description": "variegated foliage assortment"
+    },
+    {
+      "index": 3,
+      "description": "variegated shrubs and herbs"
+    },
+    {
+      "index": 4,
+      "description": "wide overview of display"
+    }
+  ],
+  "taxa": [
+    {
+      "nameJa": "レースラベンダー",
+      "photoIndices": [
+        1
+      ],
+      "confidence": "high",
+      "priceYen": 199
+    },
+    {
+      "nameJa": "ツルマサキ",
+      "photoIndices": [
+        2,
+        3
+      ],
+      "confidence": "high",
+      "note": "multiple variegated cultivars; exact cultivar unresolved"
+    },
+    {
+      "nameJa": "プリムローズジャスミン",
+      "photoIndices": [
+        3,
+        4
+      ],
+      "confidence": "medium",
+      "note": "based on shelf label"
+    },
+    {
+      "nameJa": "プリペットシルバー",
+      "photoIndices": [
+        2,
+        4
+      ],
+      "confidence": "medium",
+      "note": "based on shelf label"
+    },
+    {
+      "displayLabel": "スモーキーホワイト",
+      "photoIndices": [
+        4
+      ],
+      "confidence": "medium",
+      "note": "taxonomic identification pending"
+    },
+    {
+      "nameJa": "ハーブ類",
+      "photoIndices": [
+        4
+      ],
+      "confidence": "low",
+      "note": "multiple species, not individually identified"
+    }
+  ],
+  "notes": "Photographs were supplied in chat; image binaries are not embedded in this JSON. No purchase or planting confirmed."
+}
